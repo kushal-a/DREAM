@@ -1,0 +1,24 @@
+{
+        "camera_settings": [
+                {
+                        "id": "", 
+                        "name": "rgb_camera_link", 
+                        "intrinsic_settings": {
+                                "fx": 399.6578776041667, 
+                                "fy": 399.4959309895833, 
+                                "cx": 319.8955891927083, 
+                                "cy": 244.0602823893229, 
+                                "s": 0.0, 
+                                "hfov": "", 
+                                "resolution": {
+                                        "width": 640, 
+                                        "height": 480
+                                }
+                        }, 
+                        "captured_image_size": {
+                                "width": 640, 
+                                "height": 480
+                        }
+                }
+        ]
+}

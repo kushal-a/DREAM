@@ -220,7 +220,6 @@ def find_ndds_data_in_dir(
     # Process config files, which are data files that don't have an associated image
     found_configs = {"camera": None, "object": None, "unsorted": []}
     data_filenames_without_images = [f for f in data_filenames if not f[0].isdigit()]
-
     for data_filename in data_filenames_without_images:
         if data_filename == "_camera_settings" + data_full_ext:
             found_configs["camera"] = os.path.join(input_dir, data_filename)

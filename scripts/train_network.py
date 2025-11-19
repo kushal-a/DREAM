@@ -54,7 +54,7 @@ def train_network(args):
     if args.output_dir:
         save_results = True
         if not args.resume_training:
-            dream.utilities.makedirs(args.output_dir, exist_ok=args.force_overwrite)
+            makedirs(args.output_dir, exist_ok=args.force_overwrite)
     else:
         assert (
             not args.resume_training

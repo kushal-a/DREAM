@@ -1,0 +1,19 @@
+{
+	"exported_object_classes": [
+		"franka"
+	],
+	"exported_objects": [
+		{
+			"class": "franka",
+			"segmentation_class_id": 127,
+			"segmentation_instance_id": 0,
+			"fixed_model_transform": [
+				[ 0, 0, 1, 0 ],
+				[ -1, 0, 0, 0 ],
+				[ 0, -1, 0, 0 ],
+				[ 0, 0, 0, 1 ]
+			],
+			"cuboid_dimensions": [ 24.891700744628906, 18.438400268554688, 11.000200271606445 ]
+		}
+	]
+}

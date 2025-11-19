@@ -1,0 +1,24 @@
+{
+        "camera_settings": [
+                {
+                        "id": "", 
+                        "name": "kinect_rgb_optical_frame", 
+                        "intrinsic_settings": {
+                                "fx": 525.0, 
+                                "fy": 525.0, 
+                                "cx": 319.5, 
+                                "cy": 239.5, 
+                                "s": 0.0, 
+                                "hfov": "", 
+                                "resolution": {
+                                        "width": 640, 
+                                        "height": 480
+                                }
+                        }, 
+                        "captured_image_size": {
+                                "width": 640, 
+                                "height": 480
+                        }
+                }
+        ]
+}

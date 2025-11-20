@@ -1,0 +1,3 @@
+[submodule "PoseDiffExps/posediff"]
+	path = PoseDiffExps/posediff
+	url = https://github.com/Glonks/PoseDiff-experiments.git

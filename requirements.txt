@@ -2,7 +2,7 @@ future
 albumentations
 enum34
 matplotlib
-numpy
+numpy==2.3.4
 opencv-python
 pandas
 Pillow
@@ -12,8 +12,9 @@ ruamel.yaml
 seaborn
 scipy
 tensorboardX
-torch
-torchvision
+torch==2.9.0
+torchvision==0.24.0
 tqdm
 webcolors
 gdown
+PyYAML==6.0.3

@@ -1,3 +1,13 @@
 analyze_results/*.png
 __pycache__/
 training_results/
+PoseDiffExps/posediff/__pycache__/
+PoseDiffExps/posediff/components/__pycache__/
+PoseDiffExps/posediff/components/diffusers/__pycache__/
+PoseDiffExps/posediff/components/unet/__pycache__/
+PoseDiffExps/posediff/components/transformers/__pycache__/
+PoseDiffExps/build/
+PoseDiffExps/posediff.egg-info/
+build/
+*.pyc
+dream.egg-info/

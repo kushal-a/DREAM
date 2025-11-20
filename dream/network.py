@@ -7,12 +7,20 @@ from PIL import Image as PILImage
 
 import numpy as np
 import ruamel.yaml
+import yaml
 import torch
 import torchvision.transforms as TVTransforms
 
 import dream
+import posediff
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+KNOWN_OPTIMIZERS = [
+    "adam",  # the Adam optimizer
+    "sgd",
+]  # the Stochastic Gradient Descent optimizer
+
 
 def create_network_from_config_file(config_file_path, network_params_path=None):
 
@@ -132,12 +140,6 @@ class DreamNetwork:
             "output_heads" in self.network_config["architecture"]
         ), 'Required key "output_heads" in dictionary "architecture" is missing from network configuration.'
 
-        assert (
-            self.architecture_type in KNOWN_ARCHITECTURES
-        ), 'Expected architecture type "{}" to be in the list of known network architectures, but it is not.'.format(
-            self.architecture_type
-        )
-
         # Assert that the input heads have been specified
         assert (
             "input_heads" in self.network_config["architecture"]
@@ -178,11 +180,14 @@ class DreamNetwork:
         # This in the scale of the belief map, which is 0 - 1.0.
         self.belief_peak_next_best_score = 0.25
 
-        # Create architectures TODO
+        # Create architectures 
         # Define self.model, self.criterion. See example below
         # self.model = torch.nn.DataParallel(dream.models.DreamHourglass(self.n_keypoints, **vgg_kwargs),device_ids=data_parallel_device_ids,).cuda()
         # self.criterion = torch.nn.MSELoss()
-        
+        with open(network_config["posediff_config"], 'r') as file:
+            config = yaml.safe_load(file)
+        self.model = posediff.PoseDiffModel(config).cuda()
+        self.criterion = torch.nn.MSELoss()
 
         # Optimizer is created in a separate call, because this isn't needed unless we're training
         self.optimizer = None
@@ -225,9 +230,9 @@ class DreamNetwork:
         return loss
 
     def loss(self, network_input_heads, target):
-        network_output_heads = self.model(network_input_heads[0])
+        pred_noise, act_noise = self.model(network_input_heads, target)
         # Verify TODO
-        loss = self.criterion(network_output_heads[0], target)
+        loss = self.criterion(pred_noise, act_noise)
 
         return loss
 
@@ -501,8 +506,59 @@ class DreamNetwork:
 
     def enable_training(self):
 
-        # Set up optimizer TODO
-        self.optimizer = torch.optim.Adam()
+        # Load optimizer if needed
+        if not self.optimizer:
+
+            assert (
+                "optimizer" in self.network_config["training"]["config"]
+            ), 'Required key "optimizer" in dictionary "config" is missing from network configuration.'
+            assert (
+                "type" in self.network_config["training"]["config"]["optimizer"]
+            ), 'Required key "type" in dictionary "optimizer" is missing from network configuration.'
+
+            network_parameters = filter(
+                lambda p: p.requires_grad, self.model.parameters()
+            )
+            optimizer_type = self.network_config["training"]["config"]["optimizer"][
+                "type"
+            ]
+
+            assert (
+                optimizer_type in KNOWN_OPTIMIZERS
+            ), 'Expected optimizer_type "{}" to be in the list of known optimizers, but it is not.'.format(
+                optimizer_type
+            )
+
+            if optimizer_type == "adam":
+
+                assert (
+                    "learning_rate"
+                    in self.network_config["training"]["config"]["optimizer"]
+                ), 'Required key "learning_rate" in dictionary "optimizer" is missing to use the Adam optimizer.'
+
+                self.optimizer = torch.optim.Adam(
+                    network_parameters,
+                    lr=self.network_config["training"]["config"]["optimizer"][
+                        "learning_rate"
+                    ],
+                )
+
+            elif optimizer_type == "sgd":
+
+                assert (
+                    "learning_rate"
+                    in self.network_config["training"]["config"]["optimizer"]
+                ), 'Required key "learning_rate" in dictionary "optimizer" is missing to use the SGD optimizer.'
+
+                self.optimizer = torch.optim.SGD(
+                    network_parameters,
+                    lr=self.network_config["training"]["config"]["optimizer"][
+                        "learning_rate"
+                    ],
+                )
+
+            else:
+                assert False, 'Optimizer "{}" is not defined.'.format(optimizer_type)
 
         # Enable training mode
         self.model.train()

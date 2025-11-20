@@ -54,7 +54,7 @@ def train_network(args):
     if args.output_dir:
         save_results = True
         if not args.resume_training:
-            makedirs(args.output_dir, exist_ok=args.force_overwrite)
+            dream.utilities.makedirs(args.output_dir, exist_ok=args.force_overwrite)
     else:
         assert (
             not args.resume_training
@@ -319,6 +319,7 @@ def train_network(args):
                     ]
                 ),
             ),
+            ("posediff_config", args.posediff_config)
         ]
     )
 
@@ -492,15 +493,7 @@ def train_network(args):
             # New unified training
             network_input_heads = []
             network_input_heads.append(sample["image_rgb_input"].cuda())
-
-            if dream_network.network_config["architecture"]["target"] == "belief_maps":
-                training_labels = sample["belief_maps"].cuda()
-            elif dream_network.network_config["architecture"]["target"] == "keypoints":
-                training_labels = sample["keypoint_projections_output"].cuda()
-            else:
-                assert (
-                    False
-                ), "Could not determine how to provide training labels to network."
+            training_labels = sample["keypoint_positions"].cuda()
 
             loss = dream_network.train(network_input_heads, training_labels)
 
@@ -687,6 +680,12 @@ if __name__ == "__main__":
         type=float,
         default=0.8,
         help="Fraction of training data to use for training. 1 - this quantity will be used for validation during training.",
+    )
+    parser.add_argument(
+        "-p",
+        "--posediff-config",
+        required=True,
+        help="Path to posediff configuration file.",
     )
     parser.add_argument(
         "-m",

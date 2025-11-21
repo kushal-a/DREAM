@@ -17,6 +17,7 @@ from torch.utils.data import DataLoader as TorchDataLoader
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import dream
+from pprint import pprint
 
 
 def train_network(args):
@@ -25,22 +26,20 @@ def train_network(args):
     # Parse all configurations and parameters
     yaml_parser = YAML(typ="safe")
     with open(config_file, "r") as f:
-        config = yaml_parser.load(f)
-    with open(config["model"]["manip_file"], "r") as f:
-        manipulator_config_ = yaml_parser.load(f)
-    manipulator_config = manipulator_config_["manipulator"]
+        network_config = yaml_parser.load(f)
 
     # Extract Sub Configurations
-    training_config     = config["training"]
-    dataset_config      = config["dataset"]
-    logging_config      = config["logging"]
-    architecture_config = config["architecture"]
+    dataset_config      = network_config["data_path"]
+    manipulator_config  = network_config["manipulator"]
+    architecture_config = network_config["architecture"]
+    training_config     = network_config["training"]
+    posediff_config_path= network_config["posediff_config"]
+    logging_config      = network_config["logging"]
+    
 
     # Handling Dataset Config Extraction
     dataset_path        = dataset_config["dataset_path"]
     dataset_type        = dataset_config["dataset_type"]
-    train_split         = dataset_config["train_split"]
-
     if dataset_type == "real":
         input_data_path = os.path.join(dataset_path, 
                                  dataset_type, 
@@ -56,21 +55,24 @@ def train_network(args):
         
     else:
         raise Exception("Typo in config file dataset<dataset_type")
-
-    val_split = 1 - train_split
     found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
 
     # Handling Training Config Extraction
-    hparams                         = training_config["hyperparameters"]
-    enable_augment_data             = training_config["augment"]
-    training_image_preprocessing    = training_config["image_preprocessing"]
-    training_net_input_resolution   = training_config["net_input_resolution"]
-    
-    batch_size  = hparams["batch_size"]
-    epochs      = hparams["epochs"]
-    num_workers = hparams["num_workers"]
-    lr          = hparams["lr"]
-    optimizer   = hparams["optimizer"]
+    training_config_config          = training_config["config"]
+    epochs                          = training_config_config["epochs"]
+    train_split                     = training_config_config["training_data_fraction"]
+    batch_size                      = training_config_config["batch_size"]
+    num_workers                     = training_config_config["worker_size"]
+    optimizer                       = training_config_config["optimizer"]["type"]
+    lr                              = training_config_config["optimizer"]["learning_rate"]
+    training_image_preprocessing    = training_config_config["image_preprocessing"]
+    image_raw_resolution            = training_config_config["image_raw_resolution"]
+    training_net_input_resolution   = training_config_config["net_input_resolution"]
+
+    image_raw_resolution = dream.utilities.load_image_resolution(
+        found_data[1]["camera"]
+    )
+    val_split = 1.0 - train_split
 
     # Handling Logging Config Extraction
     output_dir      = logging_config["output_dir"]
@@ -78,9 +80,41 @@ def train_network(args):
     verbose         = logging_config["verbose"] 
     dream.utilities.makedirs(output_dir, exist_ok=args.force_overwrite)
 
-    # Handling Architecture Config Extraction
+    # Handling Required Overwrites for DREAM compatibility
+    ## Handling redundencies
+    network_config["data_path"] = input_data_path
     architecture_config["image_preprocessing"] = training_image_preprocessing
+    training_config_config["validation_data_fraction"] = val_split
+    training_config_config["image_raw_resolution"] = image_raw_resolution
 
+    enable_augment_data = not args.not_augment_data
+    data_augment_config = odict([("image_rgb", True)]) if enable_augment_data else False
+    training_config_config["data_augmentation"] = data_augment_config
+
+    ## Handling dummys
+    try:
+        user = os.getlogin()
+    except:
+        user = "not found"
+    gpu_ids = args.gpu_ids if args.gpu_ids else []
+    platform_config = odict(
+        [
+            ("user", user), 
+            ("hostname", socket.gethostname()), 
+            ("gpu_ids", gpu_ids)
+        ]
+    )
+
+    ## Reconstructing config
+    training_config["config"] = training_config_config
+    training_config["platform"] = platform_config
+    network_config["training"] = training_config
+    network_config["architecture"] = architecture_config
+
+    print("Network configuration:")
+    pprint(network_config)
+
+    
     training_start_time = time.time()
 
     if args.resume_training:
@@ -188,56 +222,7 @@ def train_network(args):
 
     dream.utilities.set_random_seed(random_seed)
 
-    gpu_ids = args.gpu_ids if args.gpu_ids else []
-
-    try:
-        user = os.getlogin()
-    except:
-        user = "not found"
-
-    image_raw_resolution = dream.utilities.load_image_resolution(found_data[1]["camera"])
-
-    data_augment_config = odict([("image_rgb", True)]) if enable_augment_data else False
-
-    # Building DREAM compatible ordered dict
-    optimizer_config = odict([("type", optimizer), ("learning_rate", lr)])  
-    training_c = odict(
-        [
-            ("epochs", epochs),
-            ("training_data_fraction", train_split),
-            ("validation_data_fraction", val_split),
-            ("batch_size", batch_size),
-            ("data_augmentation", data_augment_config),
-            ("worker_size", num_workers),
-            ("optimizer", optimizer_config),
-            ("image_preprocessing", training_image_preprocessing),
-            ("image_raw_resolution", list(image_raw_resolution)),
-            ("net_input_resolution", training_net_input_resolution),
-        ]
-    )
-    platform_config = odict(
-        [
-            ("user", user), 
-            ("hostname", socket.gethostname()), 
-            ("gpu_ids", gpu_ids)
-        ]
-    )
-    training = odict(
-        [
-            ("config", training_c),
-            ("platform",platform_config),
-            ("results", odict([("epochs_trained", 0)])),
-        ]
-    )
-    network_config = odict(
-        [
-            ("data_path", input_data_path),
-            ("manipulator", manipulator_config),
-            ("architecture", architecture_config),
-            ("training", training),
-            ("posediff_config", config['model']['config_file'])
-        ]
-    )
+    dream_network = dream.create_network_from_config_data(network_config)
 
     # Now check against existing network configuration if we are resuming training
     if args.resume_training:
@@ -259,8 +244,7 @@ def train_network(args):
         start_epoch = 0
 
     # Print to screen
-    print("Network configuration: {}".format(network_config))
-    dream_network = dream.create_network_from_config_data(network_config)
+
     if args.resume_training:
         dream_network.model.load_state_dict(
             torch.load(os.path.join(output_dir, most_recent_epoch_weight_path))
@@ -524,6 +508,13 @@ if __name__ == "__main__":
         action="store_true",
         default=True,
         help="Forces overwriting of analysis results in the provided directory.",
+    )
+    parser.add_argument(
+        "-not-a",
+        "--not-augment-data",
+        action="store_true",
+        default=False,
+        help="Disable data augmentation. Without this flag, data augmentation is enabled by default.",
     )
     parser.add_argument(
         "-g",

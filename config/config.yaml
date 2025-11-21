@@ -1,38 +1,43 @@
 !!omap
-- model: !!omap 
-  - config_file: ./PoseDiffExps/posediff/configs/default.yaml
-  - manip_file: ./config/panda.yaml
 
-- training: !!omap 
-  - hyperparameters: !!omap 
-    - batch_size: 2
-    - epochs: 25
-    - lr: 0.0001
-    - num_workers: 1
-    - optimizer: adam # Choose from [adam, sgd]
-  - augment: False # True yet to be implemented
-  - image_preprocessing: shrink-and-crop
-  - net_input_resolution: [400, 400]
-
-- dataset: !!omap 
+- data_path: !!omap 
   - dataset_path: ./data # WRT root of dataset
   - dataset_type: real # Choose from [real, synth]
-  - train_split: 0.8 # The remaining will be used for validation
   - real: !!omap 
     - cam: 3cam_realsense # Choose from [3cam_azure, 3cam_kinect36, 3cam_reaalsense, orb]
   - synth: !!omap 
     - type: train_dr # Choose from [train_dr, test_photo, test_dr]
   - optical_flow_path: ./data_flow 
 
-- logging: !!omap 
-  - verbose: False
-  - save_results: True
-  - output_dir: ./output
+- manipulator: !!omap
+  - name: panda
+  - keypoints:
+    - name: panda_link0
+      friendly_name: Base
+      ros_frame: panda_link0
+    - name: panda_link2
+      friendly_name: Joint2
+      ros_frame: panda_link2
+    - name: panda_link3
+      friendly_name: Joint3
+      ros_frame: panda_link3
+    - name: panda_link4
+      friendly_name: Joint4
+      ros_frame: panda_link4
+    - name: panda_link6
+      friendly_name: Joint6
+      ros_frame: panda_link6
+    - name: panda_link7
+      friendly_name: Joint7
+      ros_frame: panda_link7
+    - name: panda_hand
+      friendly_name: Hand
+      ros_frame: panda_hand
 
 - architecture: !!omap
   - type: resnet
   - target: keypoints
-  - full_decoder: true
+  - full_decoder: True
   - input_heads:
     - image_rgb
   - output_heads:
@@ -42,3 +47,30 @@
     - stdev: [0.229, 0.224, 0.225]
   - loss: !!omap
     - type: mse
+  - image_preprocessing: shrink-and-crop # Will be overwritten by training below
+
+- training: !!omap 
+  - config: !!omap 
+    - epochs: 25
+    - training_data_fraction: 0.8 # The remaining will be used for validation
+    - validation_data_fraction: 0.2 # Will be overwritted according to above
+    - batch_size: 2
+    - data_augmentation : False # Will be Overwritten according to args
+    - worker_size: 1
+    - optimizer: !!omap
+      - type: adam # Choose from [adam, sgd]
+      - learning_rate: 0.0001
+    - image_preprocessing: shrink-and-crop
+    - image_raw_resolution: [640, 480] # Will be overwritten in code
+    - net_input_resolution: [400, 400]
+  - platform: dummy
+  - results: !!omap
+    - epochs_trained: 0
+
+- posediff_config: ./PoseDiffExps/posediff/configs/default.yaml
+
+- logging: !!omap 
+  - verbose: False
+  - save_results: True
+  - output_dir: ./output
+  

@@ -25,48 +25,65 @@ import dream
 
 
 def train_network(args):
+    config_file = os.path.abspath(args.config_file)
 
-    # Input argument handling
-    assert (
-        args.epochs > 0
-    ), "The number of training epochs must be greater than 0, but it is {}.".format(
-        args.epochs
-    )
-    assert (
-        args.batch_size > 0
-    ), "The training batch size must be greater than 0, but it is {}.".format(
-        args.batch_size
-    )
-    assert (
-        args.num_workers >= 0
-    ), "The number of subprocesses used for training data loading must be greater than or equal to 0, but it is {}.".format(
-        args.num_workers
-    )
+    # Parse all configurations and parameters
+    yaml_parser = YAML(typ="safe")
+    with open(config_file, "r") as f:
+        config = yaml_parser.load(f)
+    with open(config["model"]["manip_file"], "r") as f:
+        manipulator_config_ = yaml_parser.load(f)
+    with open(config["model"]["arch_file"], "r") as f:
+        architecture_config_file = yaml_parser.load(f)
+    manipulator_config = manipulator_config_["manipulator"]
 
-    # Parse training fraction
-    assert (
-        0.0 < args.training_data_fraction and args.training_data_fraction < 1.0
-    ), "Expected training_data_fraction to be within 0. and 1., but it is {}.".format(
-        args.training_data_fraction
-    )
-    validation_data_fraction = 1.0 - args.training_data_fraction
+    training_config = config["training"]
+    dataset_config = config["dataset"]
+    logging_config = config["logging"]
 
-    if args.output_dir:
-        save_results = True
-        if not args.resume_training:
-            dream.utilities.makedirs(args.output_dir, exist_ok=args.force_overwrite)
+    # Handling Dataset Config Extraction
+    dataset_path = dataset_config["dataset_path"]
+    dataset_type = dataset_config["dataset_type"]
+    train_split = dataset_config["train_split"]
+    if dataset_type == "real":
+        input_data_path = os.path.join(dataset_path, 
+                                 dataset_type, 
+                                 "panda-" + dataset_config["real"]["cam"]
+                                 )
+    elif dataset_type == "synth":
+        synth_type = dataset_config["synth"]["type"]
+        input_data_path = os.path.join(dataset_path, 
+                                 dataset_type, 
+                                 "panda_synth_" + synth_type
+                                 )
     else:
-        assert (
-            not args.resume_training
-        ), "Cannot resume training; output directory not provided."
-        save_results = False
+        raise Exception("Typo in config file dataset<dataset_type")
 
+    val_split = 1 - train_split
+    found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
+
+    # Handling Training Config Extraction
+    hparams = training_config["hyperparameters"]
+    enable_augment_data = training_config["augment"]
+    
+    batch_size = hparams["batch_size"]
+    epochs = hparams["epochs"]
+    num_workers = hparams["num_workers"]
+    lr = hparams["lr"]
+    optimizer = hparams["optimizer"]
+
+    # Handling Logging Config Extraction
+    output_dir = logging_config["output_dir"]
+    save_results = logging_config["save_results"]
+    verbose = logging_config["verbose"] 
+
+    dream.utilities.makedirs(output_dir, exist_ok=args.force_overwrite)
     training_start_time = time.time()
 
     if args.resume_training:
 
         # Find the latest network we have
-        dirlist = os.listdir(args.output_dir)
+        dirlist = os.listdir(output_dir)
         epoch_weight_paths_unsorted = [
             x for x in dirlist if x.startswith("epoch") and x.endswith(".pth")
         ]
@@ -88,12 +105,12 @@ def train_network(args):
         start_epoch = epoch_numbers[0]
 
         assert (
-            start_epoch < args.epochs
+            start_epoch < epochs
         ), "Network is already trained for the number of requested epochs."
 
         # Find the best network to determine its validation loss
         best_valid_network_config_path = os.path.join(
-            args.output_dir, "best_network.yaml"
+            output_dir, "best_network.yaml"
         )
         assert os.path.exists(
             best_valid_network_config_path
@@ -107,23 +124,23 @@ def train_network(args):
         ]["mean"]
 
         # Load in the old training log
-        if os.path.exists(os.path.join(args.output_dir, "training_log.pkl")):
-            train_log_path = os.path.join(args.output_dir, "training_log.pkl")
+        if os.path.exists(os.path.join(output_dir, "training_log.pkl")):
+            train_log_path = os.path.join(output_dir, "training_log.pkl")
             with open(train_log_path, "rb") as f:
                 train_log = pickle.load(f)
             # Move this to make this consistent as if we're in the middle of training
             os.rename(
                 train_log_path,
                 os.path.join(
-                    args.output_dir, "training_log_e{}.pkl".format(start_epoch)
+                    output_dir, "training_log_e{}.pkl".format(start_epoch)
                 ),
             )
 
         elif os.path.exists(
-            os.path.join(args.output_dir, "training_log_e{}.pkl".format(start_epoch))
+            os.path.join(output_dir, "training_log_e{}.pkl".format(start_epoch))
         ):
             train_log_path = os.path.join(
-                args.output_dir, "training_log_e{}.pkl".format(start_epoch)
+                output_dir, "training_log_e{}.pkl".format(start_epoch)
             )
             with open(train_log_path, "rb") as f:
                 train_log = pickle.load(f)
@@ -168,87 +185,22 @@ def train_network(args):
 
     dream.utilities.set_random_seed(random_seed)
 
-    enable_augment_data = not args.not_augment_data
-
     gpu_ids = args.gpu_ids if args.gpu_ids else []
-
     try:
         user = os.getlogin()
     except:
         user = "not found"
-
-    # Parse input data
-    input_data_path = args.input_data_path
-    # Attempt path contraction to make path portable between different platforms
-    input_data_abs_path = os.path.abspath(input_data_path)
-    input_data_abs_path_split = input_data_abs_path.split("/")
-    if (
-        len(input_data_abs_path_split) >= 3
-        and input_data_abs_path_split[0] == ""
-        and input_data_abs_path_split[1] == "home"
-        and input_data_abs_path_split[2] == user
-    ):
-        # Change the path to use the tilde shortcut
-        input_data_path = os.path.join("~", *input_data_abs_path_split[3:])
-
-    # Find data in provided directory
-    found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
     found_data_config = found_data[1]
     image_raw_resolution = dream.utilities.load_image_resolution(
         found_data_config["camera"]
     )
 
-    # Parse manipulation configuration file
-    yaml_parser = YAML(typ="safe")
-    assert os.path.exists(
-        args.manipulator_config_path
-    ), 'Expected manipulator_config_path "{}" to exist, but it does not.'.format(
-        args.manipulator_config_path
-    )
-    with open(args.manipulator_config_path, "r") as f:
-        manipulator_config_file = yaml_parser.load(f)
-    assert (
-        "manipulator" in manipulator_config_file
-    ), 'Expected key "manipulator" to exist in the manipulator config file, but it does not.'
-    manipulator_config = manipulator_config_file["manipulator"]
-
     # Parse architecture
-    assert os.path.exists(
-        args.architecture_config
-    ), 'Expected architecture_config file "{}" to exist, but it does not.'.format(
-        args.architecture_config
-    )
-    with open(args.architecture_config, "r") as f:
-        architecture_config_file = yaml_parser.load(f)
-    assert (
-        "architecture" in architecture_config_file
-    ), 'Expected key "architecture" to exist in the architecture config file, but it does not.'
     architecture_config = architecture_config_file["architecture"]
-
-    assert (
-        "training" in architecture_config_file
-    ), 'Expected key "training" to exist in the architecture config file, but it does not.'
-    assert (
-        "config" in architecture_config_file["training"]
-    ), 'Expected key "config" to exist in training dictionary in the architecture config file, but it does not.'
     training_config = architecture_config_file["training"]["config"]
-    assert (
-        "image_preprocessing" in training_config
-    ), 'Expected key "image_preprocessing" to exist in the training config in the architecture config file, but it does not.'
     training_image_preprocessing = training_config["image_preprocessing"]
-    assert (
-        "net_input_resolution" in training_config
-    ), 'Expected key "net_input_resolution" to exist in the training config in the architecture config file, but it does not.'
     training_net_input_resolution = training_config["net_input_resolution"]
-    # TODO: possibly read in other arguments here, such as optimizer, instead of using command line defaults
-
-    if "image_preprocessing" in architecture_config:
-        # This could happen if we're trying to resume training.
-        assert (
-            architecture_config["image_preprocessing"] == training_image_preprocessing
-        ), 'If defined, "image_preprocessing" in the architecture and training record must be consistent for this script to work properly.'
-    else:
-        architecture_config["image_preprocessing"] = training_image_preprocessing
+    architecture_config["image_preprocessing"] = training_image_preprocessing
 
     if enable_augment_data:
         # TODO: specify the types of image augmentation
@@ -269,24 +221,24 @@ def train_network(args):
                             "config",
                             odict(
                                 [
-                                    ("epochs", args.epochs),
+                                    ("epochs", epochs),
                                     (
                                         "training_data_fraction",
-                                        args.training_data_fraction,
+                                        train_split,
                                     ),
                                     (
                                         "validation_data_fraction",
-                                        validation_data_fraction,
+                                        val_split,
                                     ),
-                                    ("batch_size", args.batch_size),
+                                    ("batch_size", batch_size),
                                     ("data_augmentation", data_augment_config),
-                                    ("worker_size", args.num_workers),
+                                    ("worker_size", num_workers),
                                     (
                                         "optimizer",
                                         odict(
                                             [
-                                                ("type", args.optimizer),
-                                                ("learning_rate", args.learning_rate),
+                                                ("type", optimizer),
+                                                ("learning_rate", lr),
                                             ]
                                         ),
                                     ),
@@ -319,7 +271,7 @@ def train_network(args):
                     ]
                 ),
             ),
-            ("posediff_config", args.posediff_config)
+            ("posediff_config", config['model']['config_file'])
         ]
     )
 
@@ -330,7 +282,7 @@ def train_network(args):
         most_recent_config_path = most_recent_epoch_weight_path.replace("pth", "yaml")
         config_parser = YAML(typ="safe")
 
-        with open(os.path.join(args.output_dir, most_recent_config_path), "r") as f:
+        with open(os.path.join(output_dir, most_recent_config_path), "r") as f:
             most_recent_network_config_file = config_parser.load(f)
 
         # Do a bunch of network consistency checks
@@ -404,13 +356,12 @@ def train_network(args):
     dream_network = dream.create_network_from_config_data(network_config)
     if args.resume_training:
         dream_network.model.load_state_dict(
-            torch.load(os.path.join(args.output_dir, most_recent_epoch_weight_path))
+            torch.load(os.path.join(output_dir, most_recent_epoch_weight_path))
         )
     dream_network.enable_training()
 
     # The following ensures the config is consistent with the dataloader
     trained_net_input_res = dream_network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
-    assert dream_network.trained_net_input_resolution() == trained_net_input_res
 
     # Create NDDS dataset and loader
     training_debug_mode = dream.datasets.ManipulatorNDDSDatasetDebugLevels["LIGHT"]
@@ -430,21 +381,21 @@ def train_network(args):
 
     # Split into train and validation subsets
     n_data = len(found_dataset)
-    n_train_data = int(round(n_data * args.training_data_fraction))
+    n_train_data = int(round(n_data * train_split))
     n_valid_data = n_data - n_train_data
     train_dataset, valid_dataset = torch.utils.data.random_split(
         found_dataset, [n_train_data, n_valid_data]
     )
 
     train_data_loader = TorchDataLoader(
-        train_dataset, batch_size=args.batch_size, num_workers=args.num_workers
+        train_dataset, batch_size=batch_size, num_workers=num_workers
     )
 
     valid_data_loader = TorchDataLoader(
-        #valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers
-        train_dataset, batch_size=args.batch_size, num_workers=args.num_workers
+        #valid_dataset, batch_size=batch_size, num_workers=num_workers
+        train_dataset, batch_size=batch_size, num_workers=num_workers
     )
-    writer = SummaryWriter(log_dir=args.output_dir)
+    writer = SummaryWriter(log_dir=output_dir)
 
     # Train the network
     print("")
@@ -454,12 +405,12 @@ def train_network(args):
 
     last_epoch_timestamp = 0.0
 
-    for e in tqdm(range(start_epoch, args.epochs)):
+    for e in tqdm(range(start_epoch, epochs)):
         this_epoch = e + 1
         print("Epoch {} ------------".format(this_epoch))
 
         # Training Phase ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if args.verbose:
+        if verbose:
             print("")
             print("~~ Training Phase ~~")
 
@@ -474,7 +425,7 @@ def train_network(args):
             this_batch_sample_names = sample["config"]["name"]
             this_batch_size = sample["image_rgb_input"].shape[0]
 
-            if args.verbose:
+            if verbose:
                 print("Processing batch index {} for training...".format(batch_idx))
                 print(
                     "Sample names in this training batch: {}".format(
@@ -500,7 +451,7 @@ def train_network(args):
 
             training_loss_this_batch = loss.item()
             training_batch_losses.append(training_loss_this_batch)
-            if args.verbose:
+            if verbose:
                 print(
                     "Training loss for this batch: {}".format(training_loss_this_batch)
                 )
@@ -512,7 +463,7 @@ def train_network(args):
         std_training_loss_per_batch = np.std(training_batch_losses)
 
         # Evaluation Phase ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        if args.verbose:
+        if verbose:
             print("")
             print("~~ Validation Phase ~~")
 
@@ -528,7 +479,7 @@ def train_network(args):
                 this_valid_batch_sample_names = valid_sample["config"]["name"]
                 this_valid_batch_size = valid_sample["image_rgb_input"].shape[0]
 
-                if args.verbose:
+                if verbose:
                     print("Processing batch index {} for validation...".format(valid_batch_idx))
                     print(
                         "Sample names in this validation batch: {}".format(
@@ -545,7 +496,7 @@ def train_network(args):
 
                 valid_loss_this_batch = valid_loss.item()
                 valid_batch_losses.append(valid_loss_this_batch)
-                if args.verbose:
+                if verbose:
                     print(
                         "Validation loss for this batch: {}".format(
                             valid_loss_this_batch
@@ -593,7 +544,7 @@ def train_network(args):
 
             if save_results:
                 dream_network.save_network(
-                    args.output_dir, "best_network", overwrite=True
+                    output_dir, "best_network", overwrite=True
                 )
 
         this_epoch_timestamp = time.time() - training_start_time
@@ -618,27 +569,27 @@ def train_network(args):
         if save_results:
             # Write training log so far
             epoch_training_log_path = os.path.join(
-                args.output_dir, "training_log_e{}.pkl".format(this_epoch)
+                output_dir, "training_log_e{}.pkl".format(this_epoch)
             )
             with open(epoch_training_log_path, "wb") as f:
                 pickle.dump(train_log, f)
 
             # Remove old training log
             last_epoch_training_log_path = os.path.join(
-                args.output_dir, "training_log_e{}.pkl".format(e)
+                output_dir, "training_log_e{}.pkl".format(e)
             )
             if os.path.exists(last_epoch_training_log_path):
                 os.remove(last_epoch_training_log_path)
 
             # Save this epoch
             dream_network.save_network(
-                args.output_dir, "epoch_{}".format(this_epoch), overwrite=True
+                output_dir, "epoch_{}".format(this_epoch), overwrite=True
             )
 
     # Save results
     if save_results:
         # Rename the final training log instead of re-writing it
-        training_log_path = os.path.join(args.output_dir, "training_log.pkl")
+        training_log_path = os.path.join(output_dir, "training_log.pkl")
         os.rename(epoch_training_log_path, training_log_path)
 
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -656,33 +607,9 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "-i", "--input-data-path", required=True, help="Path to training data."
-    )
-    parser.add_argument(
-        "-t",
-        "--training-data-fraction",
-        type=float,
-        default=0.8,
-        help="Fraction of training data to use for training. 1 - this quantity will be used for validation during training.",
-    )
-    parser.add_argument(
-        "-p",
-        "--posediff-config",
-        required=True,
-        help="Path to posediff configuration file.",
-    )
-    parser.add_argument(
-        "-m",
-        "--manipulator-config-path",
-        type=str,
-        required=True,
-        help="Path to a configuration file that specifies the manipulator and keypoint configuration.",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        default='./output',
-        help="Path to output directory for training results. Nothing specified means training results will NOT be saved.",
+        "-c", "--config-file", 
+        default="./config/config.yaml", type=str,
+        help="Path to config file."
     )
     parser.add_argument(
         "-f",
@@ -690,51 +617,6 @@ if __name__ == "__main__":
         action="store_true",
         default=True,
         help="Forces overwriting of analysis results in the provided directory.",
-    )
-    parser.add_argument(
-        "-ar",
-        "--architecture-config",
-        type=str,
-        required=True,
-        help="Path to a configuration file that describes the neural network architecture configuration.",
-    )
-    parser.add_argument(
-        "-e", "--epochs", type=int, required=True, help="Number of epochs to train."
-    )
-    parser.add_argument(
-        "-b",
-        "--batch-size",
-        type=int,
-        required=True,
-        help="The number of samples per batch used for training.",
-    )
-    parser.add_argument(
-        "-z",
-        "--optimizer",
-        choices=dream.KNOWN_OPTIMIZERS,
-        default="adam",
-        help="The optimizer type to use.",
-    )
-    parser.add_argument(
-        "-lr",
-        "--learning-rate",
-        type=float,
-        default=0.0001,
-        help="The learning rate used for the optimizer.",
-    )
-    parser.add_argument(
-        "-not-a",
-        "--not-augment-data",
-        action="store_true",
-        default=True,
-        help="Disable data augmentation. Without this flag, data augmentation is disabled by default.",
-    )
-    parser.add_argument(
-        "-w",
-        "--num-workers",
-        type=int,
-        default=8,
-        help='The number of subprocesses ("workers") used for loading the training data. 0 means that no subprocesses are used.',
     )
     parser.add_argument(
         "-g",
@@ -746,13 +628,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-s", "--random-seed", type=int, help="Manually specify the random seed."
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Outputs all diagnostic information to the screen.",
     )
     parser.add_argument(
         "-r",

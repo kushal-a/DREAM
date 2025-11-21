@@ -1,5 +1,5 @@
 !!omap
-
+# Do not change order or format of the config file
 - data_path: !!omap 
   - dataset_path: ./data # WRT root of dataset
   - dataset_type: real # Choose from [real, synth]

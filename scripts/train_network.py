@@ -113,10 +113,10 @@ def train_network(args):
 
     print("Network configuration:")
     pprint(network_config)
-
     
     training_start_time = time.time()
 
+    # Load weights, logs and config from output directory if resuming training
     if args.resume_training:
 
         # Find the latest network we have
@@ -200,6 +200,18 @@ def train_network(args):
         else:
             train_log["epochs_resumed"] = [start_epoch + 1]
 
+        # Load corresponding config file to ensure we're consistent
+        most_recent_config_path = most_recent_epoch_weight_path.replace("pth", "yaml")
+        config_parser = YAML(typ="safe")
+
+        with open(os.path.join(output_dir, most_recent_config_path), "r") as f:
+            most_recent_network_config_file = config_parser.load(f)
+
+        # Use this one instead!
+        network_config = most_recent_network_config_file
+
+        print("~~ RESUMING TRAINING FROM {} ~~".format(most_recent_epoch_weight_path))
+        print("")
     else:
         # Determine the random seed
         random_seed = (
@@ -219,54 +231,21 @@ def train_network(args):
             "random_seed": random_seed,
         }
         best_valid_loss = float("Inf")
+        start_epoch = 0
 
     dream.utilities.set_random_seed(random_seed)
 
     dream_network = dream.create_network_from_config_data(network_config)
-
-    # Now check against existing network configuration if we are resuming training
-    if args.resume_training:
-
-        # Load corresponding config file to ensure we're consistent
-        most_recent_config_path = most_recent_epoch_weight_path.replace("pth", "yaml")
-        config_parser = YAML(typ="safe")
-
-        with open(os.path.join(output_dir, most_recent_config_path), "r") as f:
-            most_recent_network_config_file = config_parser.load(f)
-
-        # Use this one instead!
-        network_config = most_recent_network_config_file
-
-        print("~~ RESUMING TRAINING FROM {} ~~".format(most_recent_epoch_weight_path))
-        print("")
-
-    else:
-        start_epoch = 0
-
-    # Print to screen
-
-    if args.resume_training:
-        dream_network.model.load_state_dict(
-            torch.load(os.path.join(output_dir, most_recent_epoch_weight_path))
-        )
     dream_network.enable_training()
-
-    # The following ensures the config is consistent with the dataloader
-    trained_net_input_res = dream_network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
 
     # Create NDDS dataset and loader
     training_debug_mode = dream.datasets.ManipulatorNDDSDatasetDebugLevels["LIGHT"]
-    network_requires_belief_maps = (
-        dream_network.network_config["architecture"]["target"] == "belief_maps"
-    )
+
     found_dataset = dream.datasets.ManipulatorNDDSDataset(
         found_data,
-        manipulator_config["name"],
         dream_network,
-        trained_net_input_res,
         augment_data=enable_augment_data,
         include_ground_truth=True,
-        include_belief_maps=network_requires_belief_maps,
         debug_mode=training_debug_mode,
     )
 
@@ -283,8 +262,7 @@ def train_network(args):
     )
 
     valid_data_loader = TorchDataLoader(
-        #valid_dataset, batch_size=batch_size, num_workers=num_workers
-        train_dataset, batch_size=batch_size, num_workers=num_workers
+        valid_dataset, batch_size=batch_size, num_workers=num_workers
     )
     writer = SummaryWriter(log_dir=output_dir)
 
@@ -309,8 +287,6 @@ def train_network(args):
 
         training_batch_losses = []
         training_batch_sample_names = []
-
-        check = []
 
         for batch_idx, sample in enumerate(tqdm(train_data_loader)):
             this_batch_sample_names = sample["config"]["name"]
@@ -365,7 +341,7 @@ def train_network(args):
             valid_batch_losses = []
             valid_batch_sample_names = []
 
-            for valid_batch_idx, valid_sample in enumerate(tqdm(train_data_loader)):
+            for valid_batch_idx, valid_sample in enumerate(tqdm(valid_data_loader)):
 
                 this_valid_batch_sample_names = valid_sample["config"]["name"]
                 this_valid_batch_size = valid_sample["image_rgb_input"].shape[0]
@@ -402,6 +378,7 @@ def train_network(args):
 
         writer.flush()
         writer.close()
+        
         # Bookkeeping and print info
         dream_network.network_config["training"]["results"]["epochs_trained"] += 1
         dream_network.network_config["training"]["results"]["training_loss"] = odict(

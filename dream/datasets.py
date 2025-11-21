@@ -34,10 +34,7 @@ class ManipulatorNDDSDataset(TorchDataset):
     def __init__(
         self,
         ndds_dataset,
-        manipulator_name,
         network,
-        network_input_resolution,
-        # network_output_resolution,
         augment_data=False,
         include_ground_truth=True,
         include_belief_maps=False,
@@ -55,10 +52,11 @@ class ManipulatorNDDSDataset(TorchDataset):
         # Read in the camera intrinsics
         self.ndds_dataset_data = ndds_dataset[0]
         self.ndds_dataset_config = ndds_dataset[1]
-        self.manipulator_name = manipulator_name
+        self.manipulator_name = network["manipulator"]["name"]
         self.keypoint_names = network.keypoint_names
-        self.network_input_resolution = network_input_resolution
-        self.network_output_resolution = network_input_resolution
+        image_raw_resolution = network["training"]["config"]["image_raw_resolution"]
+        self.network_input_resolution = network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
+        self.network_output_resolution = self.network_input_resolution
         self.augment_data = augment_data
 
         image_normalization = network.image_normalization

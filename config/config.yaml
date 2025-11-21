@@ -2,7 +2,6 @@
 - model: !!omap 
   - config_file: ./PoseDiffExps/posediff/configs/default.yaml
   - manip_file: ./config/panda.yaml
-  - arch_file: ./config/dream_resnet_f.yaml
 
 - training: !!omap 
   - hyperparameters: !!omap 
@@ -12,6 +11,8 @@
     - num_workers: 1
     - optimizer: adam # Choose from [adam, sgd]
   - augment: False # True yet to be implemented
+  - image_preprocessing: shrink-and-crop
+  - net_input_resolution: [400, 400]
 
 - dataset: !!omap 
   - dataset_path: ./data # WRT root of dataset
@@ -27,3 +28,17 @@
   - verbose: False
   - save_results: True
   - output_dir: ./output
+
+- architecture: !!omap
+  - type: resnet
+  - target: keypoints
+  - full_decoder: true
+  - input_heads:
+    - image_rgb
+  - output_heads:
+    - keypoints
+  - image_normalization: !!omap
+    - mean: [0.485, 0.456, 0.406]
+    - stdev: [0.229, 0.224, 0.225]
+  - loss: !!omap
+    - type: mse

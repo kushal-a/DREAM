@@ -18,11 +18,6 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import dream
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# import os
-# os.environ["CUDA_VISIBLE_DEVICES"]="4,5,6,7"
-# os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
-
 
 def train_network(args):
     config_file = os.path.abspath(args.config_file)
@@ -33,29 +28,32 @@ def train_network(args):
         config = yaml_parser.load(f)
     with open(config["model"]["manip_file"], "r") as f:
         manipulator_config_ = yaml_parser.load(f)
-    with open(config["model"]["arch_file"], "r") as f:
-        architecture_config_file = yaml_parser.load(f)
     manipulator_config = manipulator_config_["manipulator"]
 
-    training_config = config["training"]
-    dataset_config = config["dataset"]
-    logging_config = config["logging"]
+    # Extract Sub Configurations
+    training_config     = config["training"]
+    dataset_config      = config["dataset"]
+    logging_config      = config["logging"]
+    architecture_config = config["architecture"]
 
     # Handling Dataset Config Extraction
-    dataset_path = dataset_config["dataset_path"]
-    dataset_type = dataset_config["dataset_type"]
-    train_split = dataset_config["train_split"]
+    dataset_path        = dataset_config["dataset_path"]
+    dataset_type        = dataset_config["dataset_type"]
+    train_split         = dataset_config["train_split"]
+
     if dataset_type == "real":
         input_data_path = os.path.join(dataset_path, 
                                  dataset_type, 
                                  "panda-" + dataset_config["real"]["cam"]
                                  )
+        
     elif dataset_type == "synth":
         synth_type = dataset_config["synth"]["type"]
         input_data_path = os.path.join(dataset_path, 
                                  dataset_type, 
                                  "panda_synth_" + synth_type
                                  )
+        
     else:
         raise Exception("Typo in config file dataset<dataset_type")
 
@@ -63,21 +61,26 @@ def train_network(args):
     found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
 
     # Handling Training Config Extraction
-    hparams = training_config["hyperparameters"]
-    enable_augment_data = training_config["augment"]
+    hparams                         = training_config["hyperparameters"]
+    enable_augment_data             = training_config["augment"]
+    training_image_preprocessing    = training_config["image_preprocessing"]
+    training_net_input_resolution   = training_config["net_input_resolution"]
     
-    batch_size = hparams["batch_size"]
-    epochs = hparams["epochs"]
+    batch_size  = hparams["batch_size"]
+    epochs      = hparams["epochs"]
     num_workers = hparams["num_workers"]
-    lr = hparams["lr"]
-    optimizer = hparams["optimizer"]
+    lr          = hparams["lr"]
+    optimizer   = hparams["optimizer"]
 
     # Handling Logging Config Extraction
-    output_dir = logging_config["output_dir"]
-    save_results = logging_config["save_results"]
-    verbose = logging_config["verbose"] 
-
+    output_dir      = logging_config["output_dir"]
+    save_results    = logging_config["save_results"]
+    verbose         = logging_config["verbose"] 
     dream.utilities.makedirs(output_dir, exist_ok=args.force_overwrite)
+
+    # Handling Architecture Config Extraction
+    architecture_config["image_preprocessing"] = training_image_preprocessing
+
     training_start_time = time.time()
 
     if args.resume_training:
@@ -186,91 +189,52 @@ def train_network(args):
     dream.utilities.set_random_seed(random_seed)
 
     gpu_ids = args.gpu_ids if args.gpu_ids else []
+
     try:
         user = os.getlogin()
     except:
         user = "not found"
-    found_data_config = found_data[1]
-    image_raw_resolution = dream.utilities.load_image_resolution(
-        found_data_config["camera"]
+
+    image_raw_resolution = dream.utilities.load_image_resolution(found_data[1]["camera"])
+
+    data_augment_config = odict([("image_rgb", True)]) if enable_augment_data else False
+
+    # Building DREAM compatible ordered dict
+    optimizer_config = odict([("type", optimizer), ("learning_rate", lr)])  
+    training_c = odict(
+        [
+            ("epochs", epochs),
+            ("training_data_fraction", train_split),
+            ("validation_data_fraction", val_split),
+            ("batch_size", batch_size),
+            ("data_augmentation", data_augment_config),
+            ("worker_size", num_workers),
+            ("optimizer", optimizer_config),
+            ("image_preprocessing", training_image_preprocessing),
+            ("image_raw_resolution", list(image_raw_resolution)),
+            ("net_input_resolution", training_net_input_resolution),
+        ]
     )
-
-    # Parse architecture
-    architecture_config = architecture_config_file["architecture"]
-    training_config = architecture_config_file["training"]["config"]
-    training_image_preprocessing = training_config["image_preprocessing"]
-    training_net_input_resolution = training_config["net_input_resolution"]
-    architecture_config["image_preprocessing"] = training_image_preprocessing
-
-    if enable_augment_data:
-        # TODO: specify the types of image augmentation
-        data_augment_config = odict([("image_rgb", True)])
-    else:
-        data_augment_config = False
-
+    platform_config = odict(
+        [
+            ("user", user), 
+            ("hostname", socket.gethostname()), 
+            ("gpu_ids", gpu_ids)
+        ]
+    )
+    training = odict(
+        [
+            ("config", training_c),
+            ("platform",platform_config),
+            ("results", odict([("epochs_trained", 0)])),
+        ]
+    )
     network_config = odict(
         [
             ("data_path", input_data_path),
             ("manipulator", manipulator_config),
             ("architecture", architecture_config),
-            (
-                "training",
-                odict(
-                    [
-                        (
-                            "config",
-                            odict(
-                                [
-                                    ("epochs", epochs),
-                                    (
-                                        "training_data_fraction",
-                                        train_split,
-                                    ),
-                                    (
-                                        "validation_data_fraction",
-                                        val_split,
-                                    ),
-                                    ("batch_size", batch_size),
-                                    ("data_augmentation", data_augment_config),
-                                    ("worker_size", num_workers),
-                                    (
-                                        "optimizer",
-                                        odict(
-                                            [
-                                                ("type", optimizer),
-                                                ("learning_rate", lr),
-                                            ]
-                                        ),
-                                    ),
-                                    (
-                                        "image_preprocessing",
-                                        training_image_preprocessing,
-                                    ),
-                                    (
-                                        "image_raw_resolution",
-                                        list(image_raw_resolution),
-                                    ),
-                                    (
-                                        "net_input_resolution",
-                                        training_net_input_resolution,
-                                    ),
-                                ]
-                            ),
-                        ),  # net_output_resolution is set below
-                        (
-                            "platform",
-                            odict(
-                                [
-                                    ("user", user),
-                                    ("hostname", socket.gethostname()),
-                                    ("gpu_ids", gpu_ids),
-                                ]
-                            ),
-                        ),
-                        ("results", odict([("epochs_trained", 0)])),
-                    ]
-                ),
-            ),
+            ("training", training),
             ("posediff_config", config['model']['config_file'])
         ]
     )
@@ -284,63 +248,6 @@ def train_network(args):
 
         with open(os.path.join(output_dir, most_recent_config_path), "r") as f:
             most_recent_network_config_file = config_parser.load(f)
-
-        # Do a bunch of network consistency checks
-        assert (
-            most_recent_network_config_file["data_path"] == network_config["data_path"]
-        )
-        assert (
-            most_recent_network_config_file["manipulator"]
-            == network_config["manipulator"]
-        )
-        assert (
-            most_recent_network_config_file["architecture"]
-            == network_config["architecture"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"][
-                "training_data_fraction"
-            ]
-            == network_config["training"]["config"]["training_data_fraction"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"][
-                "validation_data_fraction"
-            ]
-            == network_config["training"]["config"]["validation_data_fraction"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"]["batch_size"]
-            == network_config["training"]["config"]["batch_size"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"]["data_augmentation"]
-            == network_config["training"]["config"]["data_augmentation"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"]["worker_size"]
-            == network_config["training"]["config"]["worker_size"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"]["optimizer"]
-            == network_config["training"]["config"]["optimizer"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"]["image_preprocessing"]
-            == network_config["training"]["config"]["image_preprocessing"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"][
-                "image_raw_resolution"
-            ]
-            == network_config["training"]["config"]["image_raw_resolution"]
-        )
-        assert (
-            most_recent_network_config_file["training"]["config"][
-                "net_input_resolution"
-            ]
-            == network_config["training"]["config"]["net_input_resolution"]
-        )
 
         # Use this one instead!
         network_config = most_recent_network_config_file

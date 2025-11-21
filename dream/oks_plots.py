@@ -61,7 +61,7 @@ for i_csv, csv_file in enumerate(args.data):
     all_dist = []
     all_pred = []
     all_gt = []
-    for i in range(7):
+    for i in range(8):
         # Compute all the distances between keypoints - Implementing them does not work well
 
         fpred = []

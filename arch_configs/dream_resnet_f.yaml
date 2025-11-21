@@ -1,15 +1,15 @@
 !!omap
 - architecture: !!omap
   - type: resnet
-  - target: belief_maps
+  - target: keypoints
   - full_decoder: true
   - input_heads:
     - image_rgb
   - output_heads:
-    - belief_maps
+    - keypoints
   - image_normalization: !!omap
-    - mean: [0.5, 0.5, 0.5]
-    - stdev: [0.5, 0.5, 0.5]
+    - mean: [0.485, 0.456, 0.406]
+    - stdev: [0.229, 0.224, 0.225]
   - loss: !!omap
     - type: mse
 - training: !!omap

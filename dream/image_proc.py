@@ -463,8 +463,8 @@ def overlay_points_on_image(
     image_input,
     image_points,
     image_point_names=None,
-    annotation_color_dot="red",
-    annotation_color_text="red",
+    annotation_color_dot="green",
+    annotation_color_text="white",
     point_diameter=6.0,
     point_thickness=-1,
 ):  # any negative value means a filled point will be drawn

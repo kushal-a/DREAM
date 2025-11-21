@@ -11,7 +11,7 @@ pytest
 ruamel.yaml
 seaborn
 scipy
-tensorboardX
+tensorboard
 torch==2.9.0
 torchvision==0.24.0
 tqdm

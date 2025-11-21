@@ -15,7 +15,7 @@ from ruamel.yaml import YAML
 import torch
 from torch.utils.data import DataLoader as TorchDataLoader
 from tqdm import tqdm
-
+from torch.utils.tensorboard import SummaryWriter
 import dream
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -409,29 +409,19 @@ def train_network(args):
     dream_network.enable_training()
 
     # The following ensures the config is consistent with the dataloader
-    (
-        trained_net_input_res,
-        trained_net_output_res,
-    ) = dream_network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
+    trained_net_input_res = dream_network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
     assert dream_network.trained_net_input_resolution() == trained_net_input_res
-    assert dream_network.trained_net_output_resolution() == trained_net_output_res
-    dream_network.network_config["training"]["config"][
-        "net_output_resolution"
-    ] = trained_net_output_res
 
     # Create NDDS dataset and loader
-    training_debug_mode = dream.datasets.ManipulatorNDDSDatasetDebugLevels["NONE"]
+    training_debug_mode = dream.datasets.ManipulatorNDDSDatasetDebugLevels["LIGHT"]
     network_requires_belief_maps = (
         dream_network.network_config["architecture"]["target"] == "belief_maps"
     )
     found_dataset = dream.datasets.ManipulatorNDDSDataset(
         found_data,
         manipulator_config["name"],
-        dream_network.keypoint_names,
+        dream_network,
         trained_net_input_res,
-        trained_net_output_res,
-        dream_network.image_normalization,
-        dream_network.image_preprocessing(),
         augment_data=enable_augment_data,
         include_ground_truth=True,
         include_belief_maps=network_requires_belief_maps,
@@ -451,8 +441,10 @@ def train_network(args):
     )
 
     valid_data_loader = TorchDataLoader(
-        valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers
+        #valid_dataset, batch_size=args.batch_size, num_workers=args.num_workers
+        train_dataset, batch_size=args.batch_size, num_workers=args.num_workers
     )
+    writer = SummaryWriter(log_dir=args.output_dir)
 
     # Train the network
     print("")
@@ -476,8 +468,9 @@ def train_network(args):
         training_batch_losses = []
         training_batch_sample_names = []
 
-        for batch_idx, sample in enumerate(tqdm(train_data_loader)):
+        check = []
 
+        for batch_idx, sample in enumerate(tqdm(train_data_loader)):
             this_batch_sample_names = sample["config"]["name"]
             this_batch_size = sample["image_rgb_input"].shape[0]
 
@@ -491,11 +484,19 @@ def train_network(args):
                 print("This training batch size: {}".format(this_batch_size))
 
             # New unified training
-            network_input_heads = []
-            network_input_heads.append(sample["image_rgb_input"].cuda())
+            network_input_heads = sample["image_rgb_input"].cuda()
             training_labels = sample["keypoint_positions"].cuda()
-
+            
             loss = dream_network.train(network_input_heads, training_labels)
+
+            # Testing image generation
+            img_grid = dream.analysis.plot_pos_on_image(
+                                                        sample["image_rgb_input_viz"],
+                                                        training_labels,
+                                                        found_dataset,
+                                                        dream_network,
+                                                    )
+            writer.add_image('sample images', img_grid, e * len(train_data_loader) + batch_idx)
 
             training_loss_this_batch = loss.item()
             training_batch_losses.append(training_loss_this_batch)
@@ -505,6 +506,7 @@ def train_network(args):
                 )
                 print("")
             training_batch_sample_names.append(this_batch_sample_names)
+            writer.add_scalar('Loss/train', training_loss_this_batch, e * len(train_data_loader) + batch_idx)
 
         mean_training_loss_per_batch = np.mean(training_batch_losses)
         std_training_loss_per_batch = np.std(training_batch_losses)
@@ -521,44 +523,23 @@ def train_network(args):
             valid_batch_losses = []
             valid_batch_sample_names = []
 
-            for valid_batch_idx, valid_sample in enumerate(tqdm(valid_data_loader)):
+            for valid_batch_idx, valid_sample in enumerate(tqdm(train_data_loader)):
 
                 this_valid_batch_sample_names = valid_sample["config"]["name"]
                 this_valid_batch_size = valid_sample["image_rgb_input"].shape[0]
 
                 if args.verbose:
-                    print(
-                        "Processing batch index {} for validation...".format(
-                            valid_batch_idx
-                        )
-                    )
+                    print("Processing batch index {} for validation...".format(valid_batch_idx))
                     print(
                         "Sample names in this validation batch: {}".format(
                             this_valid_batch_sample_names
                         )
                     )
-                    print(
-                        "This validation batch size: {}".format(this_valid_batch_size)
-                    )
+                    print("This validation batch size: {}".format(this_valid_batch_size))
 
                 # New unified validation
-                valid_network_input_heads = []
-                valid_network_input_heads.append(valid_sample["image_rgb_input"].cuda())
-
-                if (
-                    dream_network.network_config["architecture"]["target"]
-                    == "belief_maps"
-                ):
-                    valid_labels = valid_sample["belief_maps"].cuda()
-                elif (
-                    dream_network.network_config["architecture"]["target"]
-                    == "keypoints"
-                ):
-                    valid_labels = valid_sample["keypoint_projections_output"].cuda()
-                else:
-                    assert (
-                        False
-                    ), "Could not determine how to provide validation labels to network."
+                valid_network_input_heads = valid_sample["image_rgb_input"].cuda()
+                valid_labels = valid_sample["keypoint_positions"].cuda()
 
                 valid_loss = dream_network.loss(valid_network_input_heads, valid_labels)
 
@@ -572,10 +553,13 @@ def train_network(args):
                     )
                     print("")
                 valid_batch_sample_names.append(this_valid_batch_sample_names)
+                writer.add_scalar('Loss/valid', valid_loss_this_batch, e * len(valid_data_loader) + valid_batch_idx)
 
             mean_valid_loss_per_batch = np.mean(valid_batch_losses)
             std_valid_loss_per_batch = np.std(valid_batch_losses)
 
+        writer.flush()
+        writer.close()
         # Bookkeeping and print info
         dream_network.network_config["training"]["results"]["epochs_trained"] += 1
         dream_network.network_config["training"]["results"]["training_loss"] = odict(
@@ -697,13 +681,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o",
         "--output-dir",
+        default='./output',
         help="Path to output directory for training results. Nothing specified means training results will NOT be saved.",
     )
     parser.add_argument(
         "-f",
         "--force-overwrite",
         action="store_true",
-        default=False,
+        default=True,
         help="Forces overwriting of analysis results in the provided directory.",
     )
     parser.add_argument(
@@ -741,8 +726,8 @@ if __name__ == "__main__":
         "-not-a",
         "--not-augment-data",
         action="store_true",
-        default=False,
-        help="Disable data augmentation. Without this flag, data augmentation is enabled by default.",
+        default=True,
+        help="Disable data augmentation. Without this flag, data augmentation is disabled by default.",
     )
     parser.add_argument(
         "-w",

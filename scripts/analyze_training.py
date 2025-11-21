@@ -9,6 +9,7 @@ import pickle
 from ruamel.yaml import YAML
 
 import dream.analysis as dream_analysis
+import dream
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -91,26 +92,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "--input-params-path",
-        required=True,
+        default='./output/',
         help="Path to network parameters file.",
     )
     parser.add_argument(
         "-c",
         "--input-config-path",
-        default=None,
+        default='./output/epoch_25.yaml',
         help="Path to network configuration file.",
     )
     parser.add_argument(
         "-o",
         "--output-dir",
-        required=True,
+        default="training_analysis",
         help="Path to output directory to save training analysis results.",
     )
     parser.add_argument(
         "-f",
         "--force-overwrite",
         action="store_true",
-        default=False,
+        default=True,
         help="Forces overwriting of analysis results in the provided directory.",
     )
     parser.add_argument(

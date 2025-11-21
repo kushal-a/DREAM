@@ -11,3 +11,6 @@ PoseDiffExps/posediff.egg-info/
 build/
 *.pyc
 dream.egg-info/
+
+output/
+training_analysis/

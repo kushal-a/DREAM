@@ -13,8 +13,10 @@ from ruamel.yaml import YAML
 import torch
 from torch.utils.data import DataLoader as TorchDataLoader
 from tqdm import tqdm
+import torchvision
 
 import dream
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1187,3 +1189,27 @@ def sample_range_analysis(
         output_dir, image_prefix + "_net_input_kp.png"
     )
     mosaic_net_input_overlay.save(mosaic_net_input_overlay_path)
+
+def plot_pos_on_image(images, points, dataset, network):
+    images = images.cpu()
+    points = points.cpu().numpy()
+    camera_K = dream.utilities.load_camera_intrinsics(dataset.ndds_dataset_config["camera"])
+    images = dream.image_proc.images_from_tensor(images)
+
+    for i in range(len(images)):
+        projections = dream.point_projection_from_3d(camera_K, points[i])
+        projections = dream.image_proc.convert_keypoints_to_netin_from_raw(
+            projections,
+            dataset.image_raw_resolution,
+            dataset.network_input_resolution,
+            network.image_preprocessing()
+        )
+        images[i] = dream.image_proc.overlay_points_on_image(
+            images[i],
+            projections,
+            network.keypoint_names,
+        )
+    
+    img_grid = dream.image_proc.mosaic_images(images, cols=4)
+    img_grid = dataset.tensor_from_image_no_norm_tform(img_grid)
+    return img_grid

@@ -35,25 +35,34 @@ class ManipulatorNDDSDataset(TorchDataset):
         self,
         ndds_dataset,
         manipulator_name,
-        keypoint_names,
+        network,
         network_input_resolution,
-        network_output_resolution,
-        image_normalization,
-        image_preprocessing,
+        # network_output_resolution,
         augment_data=False,
         include_ground_truth=True,
         include_belief_maps=False,
         debug_mode=ManipulatorNDDSDatasetDebugLevels["NONE"],
     ):
+        """
+            Arguments:
+                ndds_dataset = data, config
+                    where `data` is a list of { 'name': '000001',
+                                                'data_path': '.../000001.json',
+                                                'image0_paths': { 'rgb': '.../000001.rgb.jpg' }}
+                    and `config` is TODO
+                keypoint_names = 
+        """
         # Read in the camera intrinsics
         self.ndds_dataset_data = ndds_dataset[0]
         self.ndds_dataset_config = ndds_dataset[1]
         self.manipulator_name = manipulator_name
-        self.keypoint_names = keypoint_names
+        self.keypoint_names = network.keypoint_names
         self.network_input_resolution = network_input_resolution
-        self.network_output_resolution = network_output_resolution
+        self.network_output_resolution = network_input_resolution
         self.augment_data = augment_data
 
+        image_normalization = network.image_normalization
+        image_preprocessing = network.image_preprocessing()
         # If include_belief_maps is specified, include_ground_truth must also be
         # TBD: revisit better way of passing inputs, maybe to make one argument instead of two
         if include_belief_maps:
@@ -102,10 +111,11 @@ class ManipulatorNDDSDataset(TorchDataset):
             image_preprocessing
         )
         self.image_preprocessing = image_preprocessing
+        self[0]
 
     def __len__(self):
         return len(self.ndds_dataset_data)
-
+    
     def __getitem__(self, index):
 
         # Parse this datum
@@ -127,6 +137,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         # Load image and transform to network input resolution -- pre augmentation
         image_rgb_raw = PILImage.open(image_rgb_path).convert("RGB")
         image_raw_resolution = image_rgb_raw.size
+        self.image_raw_resolution = image_raw_resolution
 
         # Do image preprocessing, including keypoint conversion
         image_rgb_before_aug = dream.image_proc.preprocess_image(
@@ -134,7 +145,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         )
         kp_projs_before_aug = dream.image_proc.convert_keypoints_to_netin_from_raw(
             keypoints["projections"],
-            image_raw_resolution,
+            self.image_raw_resolution,
             self.network_input_resolution,
             self.image_preprocessing,
         )
@@ -199,14 +210,6 @@ class ManipulatorNDDSDataset(TorchDataset):
             "config": datum,
         }
 
-        # Generate the belief maps directly
-        if self.include_belief_maps:
-            belief_maps = dream.image_proc.create_belief_map(
-                self.network_output_resolution, kp_projs_net_output_as_tensor
-            )
-            belief_maps_as_tensor = torch.tensor(belief_maps).float()
-            sample["belief_maps"] = belief_maps_as_tensor
-
         if self.debug_mode >= ManipulatorNDDSDatasetDebugLevels["LIGHT"]:
             kp_projections_as_tensor = torch.from_numpy(
                 np.array(keypoints["projections"])
@@ -247,25 +250,25 @@ class ManipulatorNDDSDataset(TorchDataset):
             )
             debug_image_rgb_net_output.show()
 
-            if self.include_belief_maps:
-                for kp_idx in range(len(self.keypoint_names)):
-                    belief_map_kp = dream.image_proc.image_from_belief_map(
-                        belief_maps_as_tensor[kp_idx]
-                    )
-                    belief_map_kp.show()
+            # if self.include_belief_maps:
+            #     for kp_idx in range(len(self.keypoint_names)):
+            #         belief_map_kp = dream.image_proc.image_from_belief_map(
+            #             belief_maps_as_tensor[kp_idx]
+            #         )
+            #         belief_map_kp.show()
 
-                    belief_map_kp_upscaled = belief_map_kp.resize(
-                        self.network_input_resolution, resample=PILImage.BILINEAR
-                    )
-                    image_rgb_net_output_belief_blend = PILImage.blend(
-                        image_rgb_net_input, belief_map_kp_upscaled, alpha=0.5
-                    )
-                    image_rgb_net_output_belief_blend_overlay = dream.image_proc.overlay_points_on_image(
-                        image_rgb_net_output_belief_blend,
-                        [kp_projs_net_input[kp_idx]],
-                        [self.keypoint_names[kp_idx]],
-                    )
-                    image_rgb_net_output_belief_blend_overlay.show()
+            #         belief_map_kp_upscaled = belief_map_kp.resize(
+            #             self.network_input_resolution, resample=PILImage.BILINEAR
+            #         )
+            #         image_rgb_net_output_belief_blend = PILImage.blend(
+            #             image_rgb_net_input, belief_map_kp_upscaled, alpha=0.5
+            #         )
+            #         image_rgb_net_output_belief_blend_overlay = dream.image_proc.overlay_points_on_image(
+            #             image_rgb_net_output_belief_blend,
+            #             [kp_projs_net_input[kp_idx]],
+            #             [self.keypoint_names[kp_idx]],
+            #         )
+            #         image_rgb_net_output_belief_blend_overlay.show()
 
             # This only works if the number of workers is zero
             input("Press Enter to continue...")

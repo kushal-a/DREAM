@@ -186,27 +186,27 @@ class DreamNetwork:
         # self.criterion = torch.nn.MSELoss()
         with open(network_config["posediff_config"], 'r') as file:
             config = yaml.safe_load(file)
-        self.model = posediff.PoseDiffModel(config).cuda()
+        self.model = posediff.PoseDiffModel(config)
         self.criterion = torch.nn.MSELoss()
 
         # Optimizer is created in a separate call, because this isn't needed unless we're training
         self.optimizer = None
 
-        # Now determine trained network output resolution, if not specified, or assert consistency if so
-        trained_net_out_res_from_model = self.net_output_resolution_from_input_resolution(
-            self.trained_net_input_resolution()
-        )
-        trained_net_out_res_from_model_as_list = list(trained_net_out_res_from_model)
-        if "net_output_resolution" in self.network_config["training"]["config"]:
-            assert (
-                self.network_config["training"]["config"]["net_output_resolution"]
-                == trained_net_out_res_from_model_as_list
-            ), "Network model and config file disagree for trained network output resolution."
-        else:
-            # Add to config
-            self.network_config["training"]["config"][
-                "net_output_resolution"
-            ] = trained_net_out_res_from_model_as_list
+        # # Now determine trained network output resolution, if not specified, or assert consistency if so
+        # trained_net_out_res_from_model = self.net_output_resolution_from_input_resolution(
+        #     self.trained_net_input_resolution()
+        # )
+        # trained_net_out_res_from_model_as_list = list(trained_net_out_res_from_model)
+        # if "net_output_resolution" in self.network_config["training"]["config"]:
+        #     assert (
+        #         self.network_config["training"]["config"]["net_output_resolution"]
+        #         == trained_net_out_res_from_model_as_list
+        #     ), "Network model and config file disagree for trained network output resolution."
+        # else:
+        #     # Add to config
+        #     self.network_config["training"]["config"][
+        #         "net_output_resolution"
+        #     ] = trained_net_out_res_from_model_as_list
 
     def trained_net_input_resolution(self):
         return tuple(self.network_config["training"]["config"]["net_input_resolution"])
@@ -230,9 +230,11 @@ class DreamNetwork:
         return loss
 
     def loss(self, network_input_heads, target):
-        pred_noise, act_noise = self.model(network_input_heads, target)
+        target = target.reshape(network_input_heads.shape[0], -1)
+        noise = torch.randn_like(target)
+        pred_noise = self.model(network_input_heads, target, noise)
         # Verify TODO
-        loss = self.criterion(pred_noise, act_noise)
+        loss = self.criterion(pred_noise, noise)
 
         return loss
 
@@ -261,11 +263,11 @@ class DreamNetwork:
             self.trained_net_input_resolution(),
             image_preprocessing,
         )
-        net_output_resolution = self.net_output_resolution_from_input_resolution(
-            net_input_resolution
-        )
+        # net_output_resolution = self.net_output_resolution_from_input_resolution(
+        #     net_input_resolution
+        # )
 
-        return net_input_resolution, net_output_resolution
+        return net_input_resolution#, net_output_resolution
 
     def net_output_resolution_from_input_resolution(self, net_input_resolution):
 
@@ -282,9 +284,11 @@ class DreamNetwork:
         # This assumes there is only one input head, which is the RGB image
         with torch.no_grad():
             net_input_as_tensor_batch = torch.zeros(
-                1, 3, netin_height, netin_width
+                2, 3, netin_height, netin_width
             ).cuda()
-            net_output_as_tensor_batch = self.model(net_input_as_tensor_batch)
+            target = torch.zeros(2, self.n_keypoints*3).cuda()
+            noise = torch.zeros_like(target).cuda()
+            net_output_as_tensor_batch = self.model(net_input_as_tensor_batch, target, noise)
             net_output_shape = net_output_as_tensor_batch[0][0].shape
             net_output_resolution = (net_output_shape[2], net_output_shape[1])
 

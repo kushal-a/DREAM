@@ -1,21 +1,25 @@
 # Installation
 1. Clone the repository
-  ``` bash
-  git clone https://github.com/kushal-a/DREAM.git
-  cd PoseDiffExps
-  git clone https://github.com/Glonks/PoseDiff-experiments.git posediff
-  cd ..
-  ```
+    ``` bash
+    git clone https://github.com/kushal-a/DREAM.git
+    cd PoseDiffExps
+    git clone https://github.com/Glonks/PoseDiff-experiments.git posediff
+    cd ..
+    ```
 2. Install libraries using
-  ``` bash
-  pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cu128
-  ```
-  It is preferred to use an environment.
+    ``` bash
+    pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cu128
+    ```
+    It is preferred to use an environment.
 3. Install cloned packages
-  ``` bash
-  pip install -e ./PoseDiffExps
-  pip install -e .
-  ```
+    ``` bash
+    pip install -e ./PoseDiffExps
+    pip install -e .
+    ```
+4. Download the data.  In the scripts below, be sure to comment out files you do not want, as they are very large.  Alternatively, you can download files [manually](https://drive.google.com/drive/folders/1Krp-fCT9ffEML3IpweSOgWiMHHBw6k2Z?usp=sharing)
+    ```
+    cd data; ./DOWNLOAD.sh; cd ..
+    ```
 
 # Training
 Please run the following command from the root of the repository

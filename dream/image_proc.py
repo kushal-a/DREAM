@@ -562,22 +562,18 @@ def overlay_points_on_image(
         )
 
         if image_point_names:
-            text_position = (int(point[0]) + 10, int(point[1]))
-            # Manual adjustments for Baxter, frame 500
-            # Also:  Baxter uses the following parameters:
-            #        cv2.putText(drawn_image, image_point_names[idx_point], text_position, cv2.FONT_HERSHEY_SIMPLEX, 1.5, annot_color_text, 3)
-            # if idx_point == 2:  # L-S1
-            #     text_position = (text_position[0], text_position[1] + 20)
-            # elif idx_point == 4:  # L-E1
-            #     text_position = (text_position[0], text_position[1] + 25)
-            # elif idx_point == 8:  # L-Hand
-            #     text_position = (text_position[0], text_position[1] + 25)
-            # elif idx_point == 10:  # R-S1
-            #     text_position = (text_position[0], text_position[1] + 25)
-            # elif idx_point == 13:  # R-W0
-            #     text_position = (text_position[0], text_position[1] + 10)
-            # elif idx_point == 16:  # R-Hand
-            #     text_position = (text_position[0], text_position[1] + 20)
+            if idx_point < 2:  
+                text_position = (text_position[0], text_position[1] - 20)
+            elif idx_point == 3:  # L-E1
+                text_position = (text_position[0] - 45, text_position[1] - 10)
+            elif idx_point == 4:  # L-Hand
+                text_position = (text_position[0] - 40, text_position[1] + 20)
+            elif idx_point == 5:  # R-S1
+                text_position = (text_position[0], text_position[1] + 25)
+            elif idx_point == 6:  # R-W0
+                text_position = (text_position[0], text_position[1] - 25)
+            elif idx_point == 7:  # R-Hand
+                text_position = (text_position[0], text_position[1] - 20)
             cv2.putText(
                 drawn_image,
                 image_point_names[idx_point],

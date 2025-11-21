@@ -1190,7 +1190,7 @@ def sample_range_analysis(
     )
     mosaic_net_input_overlay.save(mosaic_net_input_overlay_path)
 
-def plot_pos_on_image(images, points, dataset, network):
+def plot_pos_on_image(images, points, proj, dataset, network):
     images = images.cpu()
     points = points.cpu().numpy()
     camera_K = dream.utilities.load_camera_intrinsics(dataset.ndds_dataset_config["camera"])
@@ -1207,8 +1207,15 @@ def plot_pos_on_image(images, points, dataset, network):
         images[i] = dream.image_proc.overlay_points_on_image(
             images[i],
             projections,
-            network.keypoint_names,
+            network.friendly_keypoint_names,
+            annotation_color_dot="blue",
         )
+        images[i] = dream.image_proc.overlay_points_on_image(
+            images[i],
+            proj,
+            [],
+        )
+        
     
     img_grid = dream.image_proc.mosaic_images(images, cols=4)
     img_grid = dataset.tensor_from_image_no_norm_tform(img_grid)

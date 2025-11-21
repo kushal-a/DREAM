@@ -244,6 +244,7 @@ def train_network(args):
     found_dataset = dream.datasets.ManipulatorNDDSDataset(
         found_data,
         dream_network,
+        network_config,
         augment_data=enable_augment_data,
         include_ground_truth=True,
         debug_mode=training_debug_mode,
@@ -264,7 +265,12 @@ def train_network(args):
     valid_data_loader = TorchDataLoader(
         valid_dataset, batch_size=batch_size, num_workers=num_workers
     )
-    writer = SummaryWriter(log_dir=output_dir)
+
+    # Create a timestamped subdirectory for TensorBoard logs
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+    tb_log_dir = os.path.join(output_dir, "runs_" + timestamp)
+    os.makedirs(tb_log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=tb_log_dir)
 
     # Train the network
     print("")
@@ -276,6 +282,7 @@ def train_network(args):
 
     for e in tqdm(range(start_epoch, epochs)):
         this_epoch = e + 1
+        print("")
         print("Epoch {} ------------".format(this_epoch))
 
         # Training Phase ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -307,14 +314,14 @@ def train_network(args):
             
             loss = dream_network.train(network_input_heads, training_labels)
 
-            # Testing image generation
-            img_grid = dream.analysis.plot_pos_on_image(
-                                                        sample["image_rgb_input_viz"],
-                                                        training_labels,
-                                                        found_dataset,
-                                                        dream_network,
-                                                    )
-            writer.add_image('sample images', img_grid, e * len(train_data_loader) + batch_idx)
+            # # Saving random 4 images Shift to inference TODO
+            # mask = torch.randint(len(sample["image_rgb_input_viz"]), (4,))
+            # img_grid = dream.analysis.plot_pos_on_image(sample["image_rgb_input_viz"][mask],
+            #                                             training_labels[mask],
+            #                                             sample["keypoint_projections_input"][mask],
+            #                                             found_dataset,
+            #                                             dream_network)
+            # writer.add_image('Images/Train', img_grid, e * len(train_data_loader) + batch_idx)
 
             training_loss_this_batch = loss.item()
             training_batch_losses.append(training_loss_this_batch)
@@ -378,7 +385,7 @@ def train_network(args):
 
         writer.flush()
         writer.close()
-        
+
         # Bookkeeping and print info
         dream_network.network_config["training"]["results"]["epochs_trained"] += 1
         dream_network.network_config["training"]["results"]["training_loss"] = odict(
@@ -458,6 +465,8 @@ def train_network(args):
     if save_results:
         # Rename the final training log instead of re-writing it
         training_log_path = os.path.join(output_dir, "training_log.pkl")
+        if os.path.exists(training_log_path):
+            os.remove(training_log_path)
         os.rename(epoch_training_log_path, training_log_path)
 
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -490,7 +499,7 @@ if __name__ == "__main__":
         "-not-a",
         "--not-augment-data",
         action="store_true",
-        default=False,
+        default=True,
         help="Disable data augmentation. Without this flag, data augmentation is enabled by default.",
     )
     parser.add_argument(

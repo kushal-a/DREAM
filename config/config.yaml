@@ -46,12 +46,12 @@
     - mean: [0.485, 0.456, 0.406]
     - stdev: [0.229, 0.224, 0.225]
   - loss: !!omap
-    - type: mse
+    - type: mse # No other alternative implemented yet
   - image_preprocessing: shrink-and-crop # Will be overwritten by training below
 
 - training: !!omap 
   - config: !!omap 
-    - epochs: 25
+    - epochs: 5
     - training_data_fraction: 0.8 # The remaining will be used for validation
     - validation_data_fraction: 0.2 # Will be overwritted according to above
     - batch_size: 2

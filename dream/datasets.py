@@ -35,6 +35,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         self,
         ndds_dataset,
         network,
+        config,
         augment_data=False,
         include_ground_truth=True,
         include_belief_maps=False,
@@ -52,9 +53,9 @@ class ManipulatorNDDSDataset(TorchDataset):
         # Read in the camera intrinsics
         self.ndds_dataset_data = ndds_dataset[0]
         self.ndds_dataset_config = ndds_dataset[1]
-        self.manipulator_name = network["manipulator"]["name"]
+        self.manipulator_name = config["manipulator"]["name"]
         self.keypoint_names = network.keypoint_names
-        image_raw_resolution = network["training"]["config"]["image_raw_resolution"]
+        image_raw_resolution = config["training"]["config"]["image_raw_resolution"]
         self.network_input_resolution = network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
         self.network_output_resolution = self.network_input_resolution
         self.augment_data = augment_data
@@ -248,27 +249,6 @@ class ManipulatorNDDSDataset(TorchDataset):
             )
             debug_image_rgb_net_output.show()
 
-            # if self.include_belief_maps:
-            #     for kp_idx in range(len(self.keypoint_names)):
-            #         belief_map_kp = dream.image_proc.image_from_belief_map(
-            #             belief_maps_as_tensor[kp_idx]
-            #         )
-            #         belief_map_kp.show()
-
-            #         belief_map_kp_upscaled = belief_map_kp.resize(
-            #             self.network_input_resolution, resample=PILImage.BILINEAR
-            #         )
-            #         image_rgb_net_output_belief_blend = PILImage.blend(
-            #             image_rgb_net_input, belief_map_kp_upscaled, alpha=0.5
-            #         )
-            #         image_rgb_net_output_belief_blend_overlay = dream.image_proc.overlay_points_on_image(
-            #             image_rgb_net_output_belief_blend,
-            #             [kp_projs_net_input[kp_idx]],
-            #             [self.keypoint_names[kp_idx]],
-            #         )
-            #         image_rgb_net_output_belief_blend_overlay.show()
-
-            # This only works if the number of workers is zero
             input("Press Enter to continue...")
 
         return sample

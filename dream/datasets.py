@@ -56,8 +56,10 @@ class ManipulatorNDDSDataset(TorchDataset):
         self.manipulator_name = config["manipulator"]["name"]
         self.keypoint_names = network.keypoint_names
         image_raw_resolution = config["training"]["config"]["image_raw_resolution"]
-        self.network_input_resolution = network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
-        self.network_output_resolution = self.network_input_resolution
+        (
+            self.network_input_resolution,
+            self.network_output_resolution
+        ) = network.net_resolutions_from_image_raw_resolution(image_raw_resolution)
         self.augment_data = augment_data
 
         image_normalization = network.image_normalization

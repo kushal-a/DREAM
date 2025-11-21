@@ -314,15 +314,6 @@ def train_network(args):
             
             loss = dream_network.train(network_input_heads, training_labels)
 
-            # # Saving random 4 images Shift to inference TODO
-            # mask = torch.randint(len(sample["image_rgb_input_viz"]), (4,))
-            # img_grid = dream.analysis.plot_pos_on_image(sample["image_rgb_input_viz"][mask],
-            #                                             training_labels[mask],
-            #                                             sample["keypoint_projections_input"][mask],
-            #                                             found_dataset,
-            #                                             dream_network)
-            # writer.add_image('Images/Train', img_grid, e * len(train_data_loader) + batch_idx)
-
             training_loss_this_batch = loss.item()
             training_batch_losses.append(training_loss_this_batch)
             if verbose:

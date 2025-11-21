@@ -16,71 +16,19 @@ import dream
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-def generate_belief_map_visualizations(
-    belief_maps, keypoint_projs_detected, keypoint_projs_gt=None
-):
-
-    belief_map_images = dream.image_proc.images_from_belief_maps(
-        belief_maps, normalization_method=6
-    )
-
-    belief_map_images_kp = []
-    for kp in range(len(keypoint_projs_detected)):
-        if keypoint_projs_gt:
-            keypoint_projs = [keypoint_projs_gt[kp], keypoint_projs_detected[kp]]
-            color = ["green", "red"]
-        else:
-            keypoint_projs = [keypoint_projs_detected[kp]]
-            color = "red"
-        belief_map_image_kp = dream.image_proc.overlay_points_on_image(
-            belief_map_images[kp],
-            keypoint_projs,
-            annotation_color_dot=color,
-            annotation_color_text=color,
-            point_diameter=4,
-        )
-        belief_map_images_kp.append(belief_map_image_kp)
-    n_cols = int(math.ceil(len(keypoint_projs_detected) / 2.0))
-    belief_maps_kp_mosaic = dream.image_proc.mosaic_images(
-        belief_map_images_kp,
-        rows=2,
-        cols=n_cols,
-        inner_padding_px=10,
-        fill_color_rgb=(0, 0, 0),
-    )
-    return belief_maps_kp_mosaic
-
-
 def network_inference(args):
-
-    # Input argument handling
-    assert os.path.exists(
-        args.input_params_path
-    ), 'Expected input_params_path "{}" to exist, but it does not.'.format(
-        args.input_params_path
-    )
 
     if args.input_config_path:
         input_config_path = args.input_config_path
     else:
-        # Use params filepath to infer the config filepath
         input_config_path = os.path.splitext(args.input_params_path)[0] + ".yaml"
 
-    assert os.path.exists(
-        input_config_path
-    ), 'Expected input_config_path "{}" to exist, but it does not.'.format(
-        input_config_path
-    )
-
-    assert os.path.exists(
-        args.image_path
-    ), 'Expected image_path "{}" to exist, but it does not.'.format(args.image_path)
+    keypoints_path = os.path.splitext(args.image_path)[0]
+    keypoints_path = os.path.splitext(keypoints_path)[0]+ ".json"
 
     # Create parser
     print("# Opening config file:  {} ...".format(input_config_path))
     data_parser = YAML(typ="safe")
-
     with open(input_config_path, "r") as f:
         network_config = data_parser.load(f)
 
@@ -100,7 +48,6 @@ def network_inference(args):
     # Load in image
     print("# Loading image:  {} ...".format(args.image_path))
     image_rgb_OrigInput_asPilImage = PILImage.open(args.image_path).convert("RGB")
-    orig_image_dim = tuple(image_rgb_OrigInput_asPilImage.size)
 
     # Use image preprocessing specified by config by default, unless user specifies otherwise
     if args.image_preproc_override:
@@ -124,160 +71,54 @@ def network_inference(args):
         image_preprocessing_override=image_preprocessing,
         debug=True,
     )
-    kp_coords_wrtOrigInput_asArray = detection_result["detected_keypoints"]
-    print(
-        "Detected keypoints in input image:\n{}".format(kp_coords_wrtOrigInput_asArray)
-    )
 
-    kp_coords_wrtNetOutput_asArray = detection_result["detected_keypoints_net_output"]
+    positions = torch.tensor([detection_result["positions"]])
+    print(positions.shape)
+
     image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
-    input_image_dim = image_rgb_NetInput_asPilImage.size
-    belief_maps_wrtNetOutput_asTensor = detection_result["belief_maps"]
-    kp_coords_wrtNetInput_asArray = detection_result["detected_keypoints_net_input"]
 
-    # Read in keypoints if provided
-    if args.keypoints_path:
-        print(
-            "# Loading ground truth keypoints from {} ...".format(args.keypoints_path)
-        )
-        keypoints_gt = dream.utilities.load_keypoints(
-            args.keypoints_path,
-            dream_network.manipulator_name,
-            dream_network.keypoint_names,
-        )
-        kp_coords_gt_wrtOrig = keypoints_gt["projections"]
-        print(
-            "Ground truth keypoints in input image:\n{}".format(
-                np.array(kp_coords_gt_wrtOrig)
-            )
-        )
-
-        kp_coords_gt_wrtNetInput_asArray = dream.image_proc.convert_keypoints_to_netin_from_raw(
-            kp_coords_gt_wrtOrig,
-            orig_image_dim,
-            dream_network.trained_net_input_resolution(),
-            image_preprocessing,
-        )
-        kp_coords_gt_wrtNetOutput_asArray = dream.image_proc.convert_keypoints_to_netout_from_netin(
-            kp_coords_gt_wrtNetInput_asArray,
-            dream_network.trained_net_input_resolution(),
-            dream_network.trained_net_output_resolution(),
-        )
-        kp_coords_gt_wrtNetInput_asList = kp_coords_gt_wrtNetInput_asArray.tolist()
-        kp_coords_gt_wrtNetOutput_asList = kp_coords_gt_wrtNetOutput_asArray.tolist()
-    else:
-        print("# Not loading ground truth keypoints (not provided)")
-        kp_coords_gt_wrtNetInput_asList = None
-        kp_coords_gt_wrtNetOutput_asList = None
-
-    # Generate visualization output:  keypoints, with ground truth if requested) overlaid on image used for network input
-    keypoints_wrtNetInput_overlay = dream.image_proc.overlay_points_on_image(
-        image_rgb_NetInput_asPilImage,
-        kp_coords_gt_wrtNetInput_asList,
-        dream_network.friendly_keypoint_names,
-        annotation_color_dot="green",
-        annotation_color_text="white",
+    # Read in gt keypoints
+    print(
+        "# Loading ground truth keypoints from {} ...".format(keypoints_path)
     )
-    keypoints_wrtNetInput_overlay = dream.image_proc.overlay_points_on_image(
-        keypoints_wrtNetInput_overlay,
-        kp_coords_wrtNetInput_asArray,
-        dream_network.friendly_keypoint_names,
-        annotation_color_dot="red",
-        annotation_color_text="white",
+    
+    # Grandparent directory of the image file
+    input_data_path = os.path.dirname(os.path.abspath(args.image_path))
+    found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
+    enable_augment_data = False if not network_config['training']['config']['data_augmentation'] else True
+    found_dataset = dream.datasets.ManipulatorNDDSDataset(
+        found_data,
+        dream_network,
+        network_config,
+        augment_data=enable_augment_data,
+        include_ground_truth=True,
     )
-    keypoints_wrtNetInput_overlay.show(
+
+    img = found_dataset.tensor_from_image_no_norm_tform(
+            image_rgb_NetInput_asPilImage
+        ).unsqueeze(0)
+    
+    keypoints_gt = dream.utilities.load_keypoints(
+        keypoints_path,
+        dream_network.manipulator_name,
+        dream_network.keypoint_names,
+    )
+    keypoints_gt = dream.image_proc.convert_keypoints_to_netin_from_raw(
+            keypoints_gt["projections"],
+            found_dataset.image_raw_resolution,
+            found_dataset.network_input_resolution,
+            found_dataset.image_preprocessing,
+        )
+
+    keypoints_gt = torch.tensor(keypoints_gt, dtype=torch.float32).unsqueeze(0)
+
+    keypoints_overlay = dream.analysis.plot_pos_on_image(img,
+                                            positions,
+                                            keypoints_gt,
+                                            found_dataset,
+                                            dream_network)
+    keypoints_overlay.show(
         title="Keypoints (possibly with ground truth) on net input image"
-    )
-
-    # Generate visualization output:  mosaic of raw belief maps from network
-    belief_maps_overlay = generate_belief_map_visualizations(
-        belief_maps_wrtNetOutput_asTensor,
-        kp_coords_wrtNetOutput_asArray,
-        kp_coords_gt_wrtNetOutput_asList,
-    )
-    belief_maps_overlay.show(title="Belief map output mosaic")
-
-    # Generate visualization output:  mosaic of belief maps, with keypoints, overlaid on image used for network input
-    belief_maps_wrtNetOutput_asListOfPilImages = dream.image_proc.images_from_belief_maps(
-        belief_maps_wrtNetOutput_asTensor, normalization_method=6
-    )
-    blended_array = []
-
-    for n in range(len(kp_coords_wrtNetOutput_asArray)):
-
-        bm_wrtNetOutput_asPilImage = belief_maps_wrtNetOutput_asListOfPilImages[n]
-        kp = kp_coords_wrtNetInput_asArray[n]
-        fname = dream_network.friendly_keypoint_names[n]
-
-        bm_wrtNetInput_asPilImage = bm_wrtNetOutput_asPilImage.resize(
-            input_image_dim, resample=PILImage.BILINEAR
-        )
-        blended = PILImage.blend(
-            image_rgb_NetInput_asPilImage, bm_wrtNetInput_asPilImage, alpha=0.5
-        )
-        blended = dream.image_proc.overlay_points_on_image(
-            blended,
-            [kp],
-            [fname],
-            annotation_color_dot="red",
-            annotation_color_text="white",
-        )
-        blended_array.append(blended)
-
-    n_cols = int(math.ceil(len(kp_coords_wrtNetOutput_asArray) / 2.0))
-    belief_maps_with_kp_overlaid_mosaic = dream.image_proc.mosaic_images(
-        blended_array, rows=2, cols=n_cols, fill_color_rgb=(0, 0, 0)
-    )
-    belief_maps_with_kp_overlaid_mosaic.show(
-        title="Mosaic of belief maps, with keypoints, on original"
-    )
-
-    # Squash belief maps into one combined image
-    belief_map_combined_wrtNetOutput_asTensor = belief_maps_wrtNetOutput_asTensor.sum(
-        dim=0
-    )
-    belief_map_combined_wrtNetOutput_asPilImage = dream.image_proc.image_from_belief_map(
-        belief_map_combined_wrtNetOutput_asTensor, normalization_method=6
-    )  # clamps to b/w 0 and 1
-    belief_map_combined_wrtNetInput_asPilImage = dream.image_proc.convert_image_to_netin_from_netout(
-        belief_map_combined_wrtNetOutput_asPilImage, input_image_dim
-    )
-
-    # Generate visualization output:  belief maps, with keypoints, overlaid on image used for network input
-    belief_map_combined_wrtNetInput_overlay = PILImage.blend(
-        image_rgb_NetInput_asPilImage,
-        belief_map_combined_wrtNetInput_asPilImage,
-        alpha=0.5,
-    )
-    belief_map_combined_wrtNetInput_overlay = dream.image_proc.overlay_points_on_image(
-        belief_map_combined_wrtNetInput_overlay,
-        kp_coords_wrtNetInput_asArray,
-        dream_network.friendly_keypoint_names,
-        annotation_color_dot="red",
-        annotation_color_text="white",
-    )
-    belief_map_combined_wrtNetInput_overlay.show(
-        title="Belief maps, with keypoints, on net input image"
-    )
-
-    # Generate visualization output:  belief maps, with keypoints, overlaid on original image
-    belief_map_combined_wrtOrigInput_asPilImage = dream.image_proc.inverse_preprocess_image(
-        belief_map_combined_wrtNetInput_asPilImage, orig_image_dim, image_preprocessing
-    )
-    belief_map_combined_wrtOrigInput_overlay = PILImage.blend(
-        image_rgb_OrigInput_asPilImage,
-        belief_map_combined_wrtOrigInput_asPilImage,
-        alpha=0.5,
-    )
-    belief_map_combined_wrtOrigInput_overlay = dream.image_proc.overlay_points_on_image(
-        belief_map_combined_wrtOrigInput_overlay,
-        kp_coords_wrtOrigInput_asArray,
-        dream_network.friendly_keypoint_names,
-        annotation_color_dot="red",
-        annotation_color_text="white",
-    )
-    belief_map_combined_wrtOrigInput_overlay.show(
-        title="Belief maps, with keypoints, on original image"
     )
 
     print("Done.")
@@ -307,12 +148,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-m", "--image_path", required=True, help="Path to image used for inference."
-    )
-    parser.add_argument(
-        "-k",
-        "--keypoints_path",
-        default=None,
-        help="Path to NDDS dataset with ground truth keypoints information.",
     )
     parser.add_argument(
         "-g",

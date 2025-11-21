@@ -1193,6 +1193,7 @@ def sample_range_analysis(
 def plot_pos_on_image(images, points, proj, dataset, network):
     images = images.cpu()
     points = points.cpu().numpy()
+    proj = proj.cpu().numpy()
     camera_K = dream.utilities.load_camera_intrinsics(dataset.ndds_dataset_config["camera"])
     images = dream.image_proc.images_from_tensor(images)
 
@@ -1212,11 +1213,8 @@ def plot_pos_on_image(images, points, proj, dataset, network):
         )
         images[i] = dream.image_proc.overlay_points_on_image(
             images[i],
-            proj,
-            [],
+            proj[i]
         )
-        
-    
-    img_grid = dream.image_proc.mosaic_images(images, cols=4)
-    img_grid = dataset.tensor_from_image_no_norm_tform(img_grid)
+         
+    img_grid = dream.image_proc.mosaic_images(images, cols=4) 
     return img_grid

@@ -29,6 +29,16 @@ Run
 tensorboard --logdir=output
 ```
 
+# Inference
+## Visualization
+Run
+``` bash
+python .\scripts\network_inference.py -i .\output\epoch_25.pth -m .\data\real\panda-3cam_realsense\000000.rgb.jpg
+```
+Change param path or image path as per necessity. Green points are ground truth and blue points are detected.
+
+
+
 ------
 # Content from the original repository below:
 

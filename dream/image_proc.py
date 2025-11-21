@@ -560,8 +560,9 @@ def overlay_points_on_image(
             thickness=point_thickness_to_use,
             shift=shift,
         )
-
+        
         if image_point_names:
+            text_position = (int(point[0]) + 10, int(point[1]))
             if idx_point < 2:  
                 text_position = (text_position[0], text_position[1] - 20)
             elif idx_point == 3:  # L-E1

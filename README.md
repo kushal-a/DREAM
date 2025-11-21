@@ -20,21 +20,9 @@
 # Training
 Please run the following command from the root of the repository
 ``` bash
-python .\scripts\train_network.py -i .\data\real\panda-3cam_realsense\ -t 0.8 -m .\manip_configs\panda.yaml -ar .\arch_configs\dream_resnet_f.yaml -e 5 -lr 0.00015 -b 2 -w 1 -p .\PoseDiffExps\posediff\configs\default.yaml
+python .\scripts\train_network.py 
 ```
-The following command line arguments are available:
-| Tag | Description | Required | Default |
-| --- | --- | --- | --- |
-| `-i` `--input-data-path` | Path to training data | Yes | - |
-| `-t` `--training-data-fraction` | Fraction of training data to use for training. 1 - this quantity will be used for validation during training | No | 0.8 |
-| `-p` `--posediff-config` | Path to posediff configuration file | Yes | - |
-| `-o` `--output-dir` | Path to output directory for training results. Nothing specified means training results will NOT be saved | No | './output' |
-| `-e` `--epochs` | Number of epochs to train | Yes | - | 
-| `-b` `--batch-size` | The number of samples per batch used for training | Yes | - | 
-| `-lr` `--learning-rate` | The learning rate used for the optimizer | No | 0.0001 | 
-| `-w` `--num-workers` | The number of subprocesses ("workers") used for loading the training data. 0 means that no subprocesses are used | No | 9 |
-| `-v` `--verbose` | Outputs all diagnostic information to the screen | No | False |
-
+Edit the file `config/config.yaml` according to your convinience.
 ## Visualization
 Run
 ```bash

@@ -95,9 +95,12 @@ class DreamNetwork:
     def loss(self, network_input_heads, target):
         target = target.reshape(network_input_heads.shape[0], -1)
         noise = torch.randn_like(target)
-        pred_noise = self.model(network_input_heads, target, noise)
+        pred = self.model(network_input_heads, target, noise)
         # Verify TODO
-        loss = self.criterion(pred_noise, noise)
+        if self.model.training:
+            loss = self.criterion(pred, noise)
+        else:
+            loss = self.criterion(pred, target)
 
         return loss
 
@@ -214,7 +217,6 @@ class DreamNetwork:
     # Inference is designed to return the best output of belief_maps and keypoints
     # This is an abstraction layer so even if multiple stages are used, this only produces one set of outputs (for the final stage)
     def inference(self, network_input):
-        self.model.training = False
         network_output = self.model(network_input)
         network_output = network_output.reshape(
             network_output.shape[0], -1, 3

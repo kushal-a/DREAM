@@ -73,6 +73,8 @@ class ManipulatorNDDSDataset(TorchDataset):
         self.include_ground_truth = include_ground_truth
         self.include_belief_maps = include_belief_maps
 
+        self.dataset_name = network.network_config["data_path"].split('\\')[-1]
+
         self.debug_mode = debug_mode
 
         assert (
@@ -112,7 +114,7 @@ class ManipulatorNDDSDataset(TorchDataset):
             image_preprocessing
         )
         self.image_preprocessing = image_preprocessing
-        positions = torch.zeros((len(self),7,3))
+        # positions = torch.zeros((len(self),7,3))
         # for i in range(len(self)):
         #     positions[i] = self[i]["keypoint_positions"]
         # positions = positions.view(-1,3)
@@ -124,6 +126,36 @@ class ManipulatorNDDSDataset(TorchDataset):
         # print("  Stdev:\n{}".format(self.stdev))
         # print("  Max (wrt mean):\n{}".format(self.max))
         # exit()
+        self.clamps = {
+            "panda_synth_train_dr": {
+                "mean": [-0.2306, -0.6779, 92.8132],
+                "max": [97.2833, 94.0721, 118.0434]
+            },
+            "panda_synth_test_dr": {
+                "mean": [0.3133, -0.8090, 92.2983],
+                "max": [95.7698, 92.9244, 107.9108]
+            },
+            "panda_synth_test_photo": {
+                "mean": [0.0631, -0.4748, 92.236],
+                "max": [92.1251, 86.6405, 107.7391]
+            },
+            "panda-3cam_azure": {
+                "mean": [-0.0688, -0.0357, 0.8660],
+                "max": [0.5541, 0.5380, 0.4474]
+            },
+            "panda-3cam_realsense": {
+                "mean": [0.0880, 0.0033, 1.2756],
+                "max": [0.4982, 0.5187, 0.4986]
+            },
+            "panda-3cam_kinect36": {
+                "mean": [0.1995, -0.0179, 1.1764],
+                "max": [0.4776, 0.4056, 0.5615]
+            },
+            "panda-orb": {
+                "mean": [-0.0160, -0.0508, 1.3116],
+                "max": [0.6622, 0.4992, 0.7672]
+            },
+        }
 
     def __len__(self):
         return len(self.ndds_dataset_data)
@@ -213,6 +245,9 @@ class ManipulatorNDDSDataset(TorchDataset):
         kp_projs_net_output_as_tensor = torch.from_numpy(
             np.array(kp_projs_net_output)
         ).float()
+
+        keypoint_positions_wrt_cam_as_tensor -= torch.tensor(self.clamps[self.dataset_name]["mean"])
+        keypoint_positions_wrt_cam_as_tensor /= torch.tensor(self.clamps[self.dataset_name]["max"])
 
         # Construct output sample
         sample = {

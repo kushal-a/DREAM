@@ -113,16 +113,16 @@ class ManipulatorNDDSDataset(TorchDataset):
         )
         self.image_preprocessing = image_preprocessing
         positions = torch.zeros((len(self),7,3))
-        for i in range(len(self)):
-            positions[i] = self[i]["keypoint_positions"]
-        positions = positions.view(-1,3)
-        self.mean = torch.tensor(positions.mean(dim=0))
-        self.stdev = torch.tensor(positions.std(dim=0))
-        self.max = torch.tensor((positions - self.mean).abs().max(dim=0).values)
-        print("Dataset statistics:")
-        print("  Mean:\n{}".format(self.mean))
-        print("  Stdev:\n{}".format(self.stdev))
-        print("  Max (wrt mean):\n{}".format(self.max))
+        # for i in range(len(self)):
+        #     positions[i] = self[i]["keypoint_positions"]
+        # positions = positions.view(-1,3)
+        # self.mean = torch.tensor(positions.mean(dim=0))
+        # self.stdev = torch.tensor(positions.std(dim=0))
+        # self.max = torch.tensor((positions - self.mean).abs().max(dim=0).values)
+        # print("Dataset statistics:")
+        # print("  Mean:\n{}".format(self.mean))
+        # print("  Stdev:\n{}".format(self.stdev))
+        # print("  Max (wrt mean):\n{}".format(self.max))
         # exit()
 
     def __len__(self):

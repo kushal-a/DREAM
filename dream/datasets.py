@@ -10,6 +10,7 @@ from PIL import Image as PILImage
 import torch
 from torch.utils.data import Dataset as TorchDataset
 import torchvision.transforms as TVTransforms
+import os
 
 import dream
 
@@ -139,6 +140,7 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         # Extract keypoints from the json file
         data_path = datum["data_path"]
+
         if self.include_ground_truth:
             keypoints = dream.utilities.load_keypoints(
                 data_path, self.manipulator_name, self.keypoint_names
@@ -152,7 +154,6 @@ class ManipulatorNDDSDataset(TorchDataset):
         # Load image and transform to network input resolution -- pre augmentation
         image_rgb_raw = PILImage.open(image_rgb_path).convert("RGB")
         image_raw_resolution = image_rgb_raw.size
-        self.image_raw_resolution = image_raw_resolution
 
         # Do image preprocessing, including keypoint conversion
         image_rgb_before_aug = dream.image_proc.preprocess_image(
@@ -226,6 +227,7 @@ class ManipulatorNDDSDataset(TorchDataset):
             "keypoint_projections_output": kp_projs_net_output_as_tensor,
             "keypoint_positions": keypoint_positions_wrt_cam_as_tensor,
             "config": datum,
+            "optical_flow": self.get_optical_flow_data(image_rgb_path),
         }
 
         if self.debug_mode >= ManipulatorNDDSDatasetDebugLevels["LIGHT"]:
@@ -271,6 +273,56 @@ class ManipulatorNDDSDataset(TorchDataset):
             input("Press Enter to continue...")
 
         return sample
+    
+    def get_optical_flow_data(self, img_path):
+        optical_flow_path = self.convert_path(img_path)
+        if os.path.exists(optical_flow_path): 
+            with np.load(optical_flow_path) as data:
+                file_names = data["filenames"]
+
+            optical_flows = []
+            for file in file_names:
+                dirpath, _ = os.path.split(optical_flow_path)
+                new_filename = f"{file}.npz"
+                file_path = os.path.join(dirpath, new_filename)
+                optical_flows.append(self.process_optical_flow(file_path))
+            optical_flows_array = np.array(optical_flows)
+            return optical_flows_array
+        return None
+
+    def process_optical_flow(self, optical_flow_path):
+        with np.load(optical_flow_path) as data:
+            flow2 = np.array(data["flow"], dtype=np.int8)
+
+        flow3 = np.concatenate([flow2,np.zeros_like(flow2[:,:,0])],axis = -1)
+        optical_img = PILImage.fromarray(flow3, mode="RGB")
+        optical_img_before_aug = dream.image_proc.preprocess_image(
+            optical_img, self.network_input_resolution, self.image_preprocessing
+        )
+        optical_flow_net_input_as_tensor = torch.tensor(optical_img_before_aug) # Assuming no augmentation
+        return optical_flow_net_input_as_tensor[:,:,:2]
+
+    @staticmethod
+    def convert_path(self, path: str) -> str:
+        # Split path into components
+        parts = path.split(os.sep)
+        
+        # Replace the exact folder name "data"
+        for i, p in enumerate(parts):
+            if p == "data":
+                parts[i] = "data_flow"
+                break   # only the first exact match at that segment
+        
+        # Rebuild the path
+        new_path = os.sep.join(parts)
+        
+        # Replace .rgb.jpg with .npz at the end
+        if new_path.endswith(".rgb.jpg"):
+            new_path = new_path[:-len(".rgb.jpg")] + ".npz"
+        else:
+            raise ValueError("Expected file to end with .rgb.jpg")
+            
+        return new_path
 
 
 if __name__ == "__main__":

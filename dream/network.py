@@ -82,22 +82,22 @@ class DreamNetwork:
             self.friendly_keypoint_names.append(friendly_kp_name)
             self.ros_keypoint_frames.append(ros_kp_frame)
 
-    def train(self, network_input_heads, target):
+    def train(self, network_input_heads, target, optical_flow):
         assert self.optimizer, "Optimizer must be defined. Use enable_training() first."
 
         self.optimizer.zero_grad()
 
-        loss = self.loss(network_input_heads, target)
+        loss = self.loss(network_input_heads, target, optical_flow)
 
         loss.backward()
         self.optimizer.step()
 
         return loss
 
-    def loss(self, network_input_heads, target):
+    def loss(self, network_input_heads, target, optical_flow):
         target = target.reshape(network_input_heads.shape[0], -1)
         noise = torch.randn_like(target)
-        pred = self.model(network_input_heads, target, noise)
+        pred = self.model(network_input_heads, target, noise, optical_flow)
         # Verify TODO
         if self.model.training:
             loss = self.criterion(pred, noise)
@@ -170,7 +170,7 @@ class DreamNetwork:
     # Returns keypoints in the input image (not necessarily network input) frame
     # Allows for an optional overwrite
     def keypoints_from_image(
-        self, input_rgb_image_as_pil, image_preprocessing_override=None, debug=False
+        self, input_rgb_image_as_pil, image_preprocessing_override=None, debug=False, optical_flow = None
     ):
         # do preprocessing
         image_preprocessing = (
@@ -203,7 +203,7 @@ class DreamNetwork:
                 0
             ).cuda()
             positions_batch = self.inference(
-                input_rgb_image_as_tensor_batch
+                input_rgb_image_as_tensor_batch, optical_flow
             ).cpu()
 
         positions = np.array(
@@ -218,8 +218,8 @@ class DreamNetwork:
 
     # Inference is designed to return the best output of belief_maps and keypoints
     # This is an abstraction layer so even if multiple stages are used, this only produces one set of outputs (for the final stage)
-    def inference(self, network_input):
-        network_output = self.model(network_input)
+    def inference(self, network_input, optical_flow):
+        network_output = self.model(network_input, optical_flow)
         network_output = network_output.reshape(
             network_output.shape[0], -1, 3
         )

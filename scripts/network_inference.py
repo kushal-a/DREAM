@@ -72,7 +72,7 @@ def network_inference(args):
         debug=True,
     )
 
-    positions = torch.tensor([detection_result["positions"]])
+    positions = torch.tensor(detection_result["positions"]).unsqueeze(0)
 
     image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
 

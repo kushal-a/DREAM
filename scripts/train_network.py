@@ -342,7 +342,6 @@ def train_network(args):
 
         with torch.no_grad():
 
-            valid_batch_losses = []
             valid_batch_sample_names = []
 
             for valid_batch_idx, valid_sample in enumerate(tqdm(valid_data_loader)):
@@ -363,28 +362,19 @@ def train_network(args):
                 valid_network_input_heads = valid_sample["image_rgb_input"].cuda()
                 valid_labels = valid_sample["keypoint_positions"].cuda()
 
-                # valid_loss = dream_network.loss(valid_network_input_heads, valid_labels)
-
-
-                # valid_loss_this_batch = valid_loss.item()
-                # valid_batch_losses.append(valid_loss_this_batch)
-                # if verbose:
-                #     print(
-                #         "Validation loss for this batch: {}".format(
-                #             valid_loss_this_batch
-                #         )
-                #     )
-                #     print("")
-                # valid_batch_sample_names.append(this_valid_batch_sample_names)
-                # writer.add_scalar('Loss/valid', valid_loss_this_batch, e * len(valid_data_loader) + valid_batch_idx)
                 predicted_keypoints = dream_network.inference(valid_network_input_heads)
+                predicted_keypoints *= found_dataset.clamps[found_dataset.dataset_name]["max"]
+                predicted_keypoints += found_dataset.clamps[found_dataset.dataset_name]["mean"]
 
                 all_pred_keypoints.append(predicted_keypoints)
                 all_gt_keypoints.append(valid_labels)
                 valid_batch_sample_names.append(this_valid_batch_sample_names)
 
-            # mean_valid_loss_per_batch = np.mean(valid_batch_losses)
-            # std_valid_loss_per_batch = np.std(valid_batch_losses)
+                batch_valid_add = metrics.compute_add(predicted_keypoints, valid_labels)['add']
+                batch_valid_auc = metrics.compute_auc(predicted_keypoints, valid_labels)['auc']
+
+                writer.add_scalar('Batch/valid_ADD', batch_valid_add, e * len(train_data_loader) + batch_idx)
+                writer.add_scalar('Batch/valid_AUC', batch_valid_auc, e * len(train_data_loader) + batch_idx)
 
         all_pred_keypoints = torch.cat(all_pred_keypoints, dim=0)
         all_gt_keypoints = torch.cat(all_gt_keypoints, dim=0)
@@ -407,12 +397,6 @@ def train_network(args):
                 ("stdev", float(std_training_loss_per_batch)),
             ]
         )
-        # dream_network.network_config["training"]["results"]["validation_loss"] = odict(
-        #     [
-        #         ("mean", float(mean_valid_loss_per_batch)),
-        #         ("stdev", float(std_valid_loss_per_batch)),
-        #     ]
-        # )
         dream_network.network_config["training"]["results"]["validation_add"] = odict(
             [
                 ("mean", float(valid_add)),
@@ -428,25 +412,9 @@ def train_network(args):
                 mean_training_loss_per_batch, std_training_loss_per_batch
             )
         )
-        # print(
-        #     "Validation Loss (batch-wise mean +- 1 stdev): {} +- {}".format(
-        #         mean_valid_loss_per_batch, std_valid_loss_per_batch
-        #     )
-        # )
         print("Validation ADD (mm):  {:.5f}".format(valid_add))
         print("Validation AUC (%):   {:.5f}".format(valid_auc))
         print("=" * 70)
-
-        # Save network if it's better than anything trained so far
-        # if mean_valid_loss_per_batch < best_valid_loss:
-        #
-        #     print("Best network result so far.")
-        #     best_valid_loss = mean_valid_loss_per_batch
-        #
-        #     if save_results:
-        #         dream_network.save_network(
-        #             output_dir, "best_network", overwrite=True
-        #         )
 
         if valid_add < best_valid_add:
             print("Best network result so far (ADD: {:.5f} mm)".format(valid_add))

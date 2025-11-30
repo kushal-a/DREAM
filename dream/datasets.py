@@ -10,6 +10,7 @@ from PIL import Image as PILImage
 import torch
 from torch.utils.data import Dataset as TorchDataset
 import torchvision.transforms as TVTransforms
+import os
 
 import dream
 
@@ -139,6 +140,9 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         # Extract keypoints from the json file
         data_path = datum["data_path"]
+
+        optical_flow_path = self.convert_path(data_path)
+
         if self.include_ground_truth:
             keypoints = dream.utilities.load_keypoints(
                 data_path, self.manipulator_name, self.keypoint_names
@@ -152,7 +156,6 @@ class ManipulatorNDDSDataset(TorchDataset):
         # Load image and transform to network input resolution -- pre augmentation
         image_rgb_raw = PILImage.open(image_rgb_path).convert("RGB")
         image_raw_resolution = image_rgb_raw.size
-        self.image_raw_resolution = image_raw_resolution
 
         # Do image preprocessing, including keypoint conversion
         image_rgb_before_aug = dream.image_proc.preprocess_image(
@@ -163,6 +166,18 @@ class ManipulatorNDDSDataset(TorchDataset):
             self.image_raw_resolution,
             self.network_input_resolution,
             self.image_preprocessing,
+        )
+
+        with np.load(optical_flow_path) as data:
+            flow3 = np.array(data["optical_flow"], dtype=np.float16)
+
+        flow3 -= flow3.mean()
+        flow3 /= flow3.abs().max() + 1e-8
+
+        flow_u8 = (flow3 * 255).astype(np.uint8)
+        optical_img = PILImage.fromarray(flow_u8, mode="RGB")
+        optical_img_before_aug = dream.image_proc.preprocess_image(
+            optical_img, self.network_input_resolution, self.image_preprocessing
         )
 
         # Handle data augmentation
@@ -185,6 +200,7 @@ class ManipulatorNDDSDataset(TorchDataset):
             kp_projs_net_input = augmented_data["keypoints"]
         else:
             image_rgb_net_input = image_rgb_before_aug
+            optical_flow_net_input = optical_img_before_aug
             kp_projs_net_input = kp_projs_before_aug
 
         assert (
@@ -203,6 +219,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         image_rgb_net_input_as_tensor = self.tensor_from_image_tform(
             image_rgb_net_input
         )
+        optical_flow_net_input_as_tensor = torch.tensor(optical_flow_net_input)
 
         # This one is not (used for net input overlay visualizations - hence "viz")
         image_rgb_net_input_viz_as_tensor = self.tensor_from_image_no_norm_tform(
@@ -226,6 +243,7 @@ class ManipulatorNDDSDataset(TorchDataset):
             "keypoint_projections_output": kp_projs_net_output_as_tensor,
             "keypoint_positions": keypoint_positions_wrt_cam_as_tensor,
             "config": datum,
+            "optical_flow": optical_flow_net_input_as_tensor[:,:,:2],
         }
 
         if self.debug_mode >= ManipulatorNDDSDatasetDebugLevels["LIGHT"]:
@@ -271,6 +289,28 @@ class ManipulatorNDDSDataset(TorchDataset):
             input("Press Enter to continue...")
 
         return sample
+    
+    @staticmethod
+    def convert_path(self, path: str) -> str:
+        # Split path into components
+        parts = path.split(os.sep)
+        
+        # Replace the exact folder name "data"
+        for i, p in enumerate(parts):
+            if p == "data":
+                parts[i] = "data_flow"
+                break   # only the first exact match at that segment
+        
+        # Rebuild the path
+        new_path = os.sep.join(parts)
+        
+        # Replace .rgb.jpg with .npz at the end
+        if new_path.endswith(".rgb.jpg"):
+            new_path = new_path[:-len(".rgb.jpg")] + ".npz"
+        else:
+            raise ValueError("Expected file to end with .rgb.jpg")
+            
+        return new_path
 
 
 if __name__ == "__main__":

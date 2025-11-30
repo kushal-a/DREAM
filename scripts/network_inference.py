@@ -115,7 +115,9 @@ def network_inference(args):
                                             positions,
                                             keypoints_gt,
                                             found_dataset,
-                                            dream_network)
+                                            dream_network,
+                                            cols=1
+                                        )
     keypoints_overlay.show(
         title="Keypoints (possibly with ground truth) on net input image"
     )

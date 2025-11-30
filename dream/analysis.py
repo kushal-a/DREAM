@@ -1190,7 +1190,7 @@ def sample_range_analysis(
     )
     mosaic_net_input_overlay.save(mosaic_net_input_overlay_path)
 
-def plot_pos_on_image(images, points, proj, dataset, network):
+def plot_pos_on_image(images, points, proj, dataset, network, cols=4):
     images = images.cpu()
     points = points.cpu().numpy()
     proj = proj.cpu().numpy()
@@ -1216,5 +1216,5 @@ def plot_pos_on_image(images, points, proj, dataset, network):
             proj[i]
         )
          
-    img_grid = dream.image_proc.mosaic_images(images, cols=4) 
+    img_grid = dream.image_proc.mosaic_images(images, cols=cols) 
     return img_grid

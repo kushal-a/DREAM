@@ -73,7 +73,6 @@ def network_inference(args):
     )
 
     positions = torch.tensor([detection_result["positions"]])
-    print(positions.shape)
 
     image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
 
@@ -93,6 +92,9 @@ def network_inference(args):
         augment_data=enable_augment_data,
         include_ground_truth=True,
     )
+
+    positions *= torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["max"])
+    positions += torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["mean"])
 
     img = found_dataset.tensor_from_image_no_norm_tform(
             image_rgb_NetInput_asPilImage
@@ -138,7 +140,7 @@ if __name__ == "__main__":
         "-i",
         "--input-params-path",
         required=True,
-        help="Path to network parameters file.",
+        help="Path to network parameters file (.pth).",
     )
     parser.add_argument(
         "-c",

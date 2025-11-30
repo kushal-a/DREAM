@@ -223,8 +223,8 @@ class DreamNetwork:
         network_output = network_output.reshape(
             network_output.shape[0], -1, 3
         )
-        network_output *= torch.tensor(self.position_normalization["max"])
-        network_output += torch.tensor(self.position_normalization["mean"])
+        network_output *= torch.tensor(self.position_normalization["max"]).to(network_input.device)
+        network_output += torch.tensor(self.position_normalization["mean"]).to(network_input.device)
         return network_output
 
     def save_network_config(self, config_file_path, overwrite=False):

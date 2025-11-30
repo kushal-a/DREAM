@@ -64,7 +64,7 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         image_normalization = network.image_normalization
         image_preprocessing = network.image_preprocessing()
-        self.position_nomalization = network.position_normalization
+        self.position_normalization = network.position_normalization
         # If include_belief_maps is specified, include_ground_truth must also be
         # TBD: revisit better way of passing inputs, maybe to make one argument instead of two
         if include_belief_maps:

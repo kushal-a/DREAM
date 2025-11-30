@@ -93,9 +93,6 @@ def network_inference(args):
         include_ground_truth=True,
     )
 
-    positions *= torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["max"])
-    positions += torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["mean"])
-
     img = found_dataset.tensor_from_image_no_norm_tform(
             image_rgb_NetInput_asPilImage
         ).unsqueeze(0)

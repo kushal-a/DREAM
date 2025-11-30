@@ -44,7 +44,9 @@ class DreamNetwork:
         print("  Friendly keypoint names: {}".format(self.friendly_keypoint_names))
         print("  Architecture type: {}".format(self.architecture_type))
 
+        self.dataset_name = self.network_config["data_path"].split('/')[-1]
         self.image_normalization = self.network_config["architecture"]["image_normalization"]
+        self.position_normalization = self.network_config["architecture"]["positions_normalization"][self.dataset_name]
 
         # Create architecture and loss
         with open(network_config["posediff_config"], 'r') as file:
@@ -221,6 +223,8 @@ class DreamNetwork:
         network_output = network_output.reshape(
             network_output.shape[0], -1, 3
         )
+        network_output *= torch.tensor(self.position_normalization["max"])
+        network_output += torch.tensor(self.position_normalization["mean"])
         return network_output
 
     def save_network_config(self, config_file_path, overwrite=False):

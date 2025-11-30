@@ -64,6 +64,7 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         image_normalization = network.image_normalization
         image_preprocessing = network.image_preprocessing()
+        self.position_nomalization = network.position_normalization
         # If include_belief_maps is specified, include_ground_truth must also be
         # TBD: revisit better way of passing inputs, maybe to make one argument instead of two
         if include_belief_maps:
@@ -126,36 +127,6 @@ class ManipulatorNDDSDataset(TorchDataset):
         # print("  Stdev:\n{}".format(self.stdev))
         # print("  Max (wrt mean):\n{}".format(self.max))
         # exit()
-        self.clamps = {
-            "panda_synth_train_dr": {
-                "mean": [-0.2306, -0.6779, 92.8132],
-                "max": [97.2833, 94.0721, 118.0434]
-            },
-            "panda_synth_test_dr": {
-                "mean": [0.3133, -0.8090, 92.2983],
-                "max": [95.7698, 92.9244, 107.9108]
-            },
-            "panda_synth_test_photo": {
-                "mean": [0.0631, -0.4748, 92.236],
-                "max": [92.1251, 86.6405, 107.7391]
-            },
-            "panda-3cam_azure": {
-                "mean": [-0.0688, -0.0357, 0.8660],
-                "max": [0.5541, 0.5380, 0.4474]
-            },
-            "panda-3cam_realsense": {
-                "mean": [0.0880, 0.0033, 1.2756],
-                "max": [0.4982, 0.5187, 0.4986]
-            },
-            "panda-3cam_kinect36": {
-                "mean": [0.1995, -0.0179, 1.1764],
-                "max": [0.4776, 0.4056, 0.5615]
-            },
-            "panda-orb": {
-                "mean": [-0.0160, -0.0508, 1.3116],
-                "max": [0.6622, 0.4992, 0.7672]
-            },
-        }
 
     def __len__(self):
         return len(self.ndds_dataset_data)
@@ -246,8 +217,8 @@ class ManipulatorNDDSDataset(TorchDataset):
             np.array(kp_projs_net_output)
         ).float()
 
-        keypoint_positions_wrt_cam_as_tensor -= torch.tensor(self.clamps[self.dataset_name]["mean"])
-        keypoint_positions_wrt_cam_as_tensor /= torch.tensor(self.clamps[self.dataset_name]["max"])
+        keypoint_positions_wrt_cam_as_tensor -= torch.tensor(self.position_normalization["mean"])
+        keypoint_positions_wrt_cam_as_tensor /= torch.tensor(self.position_normalization["max"])
 
         # Construct output sample
         sample = {

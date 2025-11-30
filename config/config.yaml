@@ -48,6 +48,28 @@
   - loss: !!omap
     - type: mse # No other alternative implemented yet
   - image_preprocessing: shrink-and-crop # Will be overwritten by training below
+  - positions_normalization: !!omap
+    - panda_synth_train_dr: !!omap
+      - mean: [-0.2306, -0.6779, 92.8132]
+      - max: [97.2833, 94.0721, 118.0434]
+    - panda_synth_test_dr: !!omap
+      - mean: [0.3133, -0.8090, 92.2983]
+      - max: [95.7698, 92.9244, 107.9108]
+    - panda_synth_test_photo: !!omap
+      - mean: [0.0631, -0.4748, 92.236]
+      - max: [92.1251, 86.6405, 107.7391]
+    - panda-3cam_azure: !!omap
+      - mean: [-0.0688, -0.0357, 0.8660]
+      - max: [0.5541, 0.5380, 0.4474]
+    - panda-3cam_realsense: !!omap
+      - mean: [0.0880, 0.0033, 1.2756]
+      - max: [0.4982, 0.5187, 0.4986]
+    - panda-3cam_kinect36: !!omap
+      - mean: [0.1995, -0.0179, 1.1764]
+      - max: [0.4776, 0.4056, 0.5615]
+    - panda-orb: !!omap
+      - mean: [-0.0160, -0.0508, 1.3116]
+      - max: [0.6622, 0.4992, 0.7672]
 
 - training: !!omap 
   - config: !!omap 

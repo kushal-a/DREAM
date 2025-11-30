@@ -41,7 +41,7 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
     # This persists across the loop
     history_buffer = []
 
-    print(f"➡ Starting Processing...")
+    print(f" Starting Processing...")
     print(f"  Scene Cut Threshold: {SCENE_CHANGE_THRESHOLD} px")
 
     # --- MAIN LOOP ---
@@ -129,12 +129,17 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
         if i % 10 == 0:
             print(f"Processed frame {i}")
 
-    print(f" Completed. Data saved to {output_dir}")
+    print(f"Completed. Data saved to {output_dir}")
 
 # ------------------------------------------------------------
 # Usage
 # ------------------------------------------------------------
+<<<<<<< HEAD
 INPUT_FOLDER = "data/real/panda-3cam_realsense"
 OUTPUT_FOLDER = "data_flow/real/panda-3cam_realsense"
+=======
+INPUT_FOLDER = "./data/real/panda-3cam_realsense"
+OUTPUT_FOLDER = "./data_flow/real/panda-3cam_realsense"
+>>>>>>> 1ad70e56e309baef50b1785e8ff852263ce9cab4
 
 calculate_and_save_flow_with_history(INPUT_FOLDER, OUTPUT_FOLDER)

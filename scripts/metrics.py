@@ -49,10 +49,43 @@ def compute_add(
     return {'add': add}
 
 
+def compute_add_per_axes(
+        predicted_keypoints: torch.Tensor,
+        ground_truth_keypoints: torch.Tensor,
+):
+    l1_distance = torch.abs(predicted_keypoints - ground_truth_keypoints)  # B, N, 3
+
+    add = l1_distance.mean(dim=[0, 1]).to('cpu').numpy()
+
+    return {'add': add}
+
+
+def compute_auc_per_axes(
+        predicted_keypoints: torch.Tensor,
+        ground_truth_keypoints: torch.Tensor,
+        max_threshold: float = 1.5,
+        num_thresholds: int = 100
+):
+    thresholds = torch.linspace(0.0, max_threshold, num_thresholds, device=predicted_keypoints.device)
+    l1_distance = torch.abs(predicted_keypoints - ground_truth_keypoints)
+
+    per_sample_add = l1_distance.mean(dim=1)
+
+    accuracies = []
+    for threshold in thresholds:
+        accuracy = (per_sample_add < threshold).float().mean(dim=0).cpu().numpy()
+
+        accuracies.append(accuracy)
+
+    auc = np.trapezoid(accuracies, thresholds.cpu().numpy(), axis=0) / max_threshold
+
+    return {'auc': auc * 100}
+
+
 def compute_auc(
         predicted_keypoints: torch.Tensor,
         ground_truth_keypoints: torch.Tensor,
-        max_threshold: float = 100.0,
+        max_threshold: float = 1.5,
         num_thresholds: int = 100
 ):
     thresholds = torch.linspace(0.0, max_threshold, num_thresholds, device=predicted_keypoints.device)

@@ -103,11 +103,11 @@ def network_inference(args):
         dream_network.keypoint_names,
     )
     keypoints_gt = dream.image_proc.convert_keypoints_to_netin_from_raw(
-            keypoints_gt["projections"],
-            found_dataset.image_raw_resolution,
-            found_dataset.network_input_resolution,
-            found_dataset.image_preprocessing,
-        )
+        keypoints_gt["projections"],
+        found_dataset.image_raw_resolution,
+        found_dataset.network_input_resolution,
+        found_dataset.image_preprocessing,
+    )
 
     keypoints_gt = torch.tensor(keypoints_gt, dtype=torch.float32).unsqueeze(0)
 

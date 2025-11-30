@@ -369,7 +369,9 @@ def train_network(args):
                 valid_batch_sample_names.append(this_valid_batch_sample_names)
 
                 batch_valid_add = metrics.compute_add(predicted_keypoints, valid_labels)['add']
+                # batch_valid_add = metrics.compute_add_per_axes(predicted_keypoints, valid_labels)['add']
                 batch_valid_auc = metrics.compute_auc(predicted_keypoints, valid_labels)['auc']
+                # batch_valid_auc = metrics.compute_auc_per_axes(predicted_keypoints, valid_labels)['auc']
 
                 writer.add_scalar('Batch/valid_ADD', batch_valid_add, e * len(train_data_loader) + batch_idx)
                 writer.add_scalar('Batch/valid_AUC', batch_valid_auc, e * len(train_data_loader) + batch_idx)
@@ -377,12 +379,12 @@ def train_network(args):
         all_pred_keypoints = torch.cat(all_pred_keypoints, dim=0)
         all_gt_keypoints = torch.cat(all_gt_keypoints, dim=0)
 
-        valid_add = metrics.compute_add(all_pred_keypoints, all_gt_keypoints)['add']
-        valid_auc = metrics.compute_auc(all_pred_keypoints, all_gt_keypoints)['auc']
+        valid_add = metrics.compute_add_per_axes(all_pred_keypoints, all_gt_keypoints)['add']
+        valid_auc = metrics.compute_auc_per_axes(all_pred_keypoints, all_gt_keypoints)['auc']
 
         writer.add_scalar('Epoch/train_noise_loss', mean_training_loss_per_batch, e)
-        writer.add_scalar('Epoch/valid_ADD', valid_add, e)
-        writer.add_scalar('Epoch/valid_AUC', valid_auc, e)
+        writer.add_scalar('Epoch/valid_ADD', valid_add.mean(), e)
+        writer.add_scalar('Epoch/valid_AUC', valid_auc.mean(), e)
 
         writer.flush()
         writer.close()
@@ -397,12 +399,13 @@ def train_network(args):
         )
         dream_network.network_config["training"]["results"]["validation_add"] = odict(
             [
-                ("mean", float(valid_add)),
+                # ("mean", float(valid_add)),
+                ("mean", valid_add.tolist()),
             ]
         )
         dream_network.network_config["training"]["results"]["validation_auc"] = odict(
             [
-                ("mean", float(valid_auc)),
+                ("mean", valid_auc.tolist()),
             ]
         )
         print(
@@ -410,18 +413,18 @@ def train_network(args):
                 mean_training_loss_per_batch, std_training_loss_per_batch
             )
         )
-        print("Validation ADD (mm):  {:.5f}".format(valid_add))
-        print("Validation AUC (%):   {:.5f}".format(valid_auc))
+        print(f"Validation ADD (mm): {format(valid_add.tolist())}")
+        print(f"Validation AUC (%): {format(valid_auc.tolist())}")
         print("=" * 70)
 
-        if valid_add < best_valid_add:
-            print("Best network result so far (ADD: {:.5f} mm)".format(valid_add))
-            best_valid_add = valid_add
-
-            if save_results:
-                dream_network.save_network(
-                    output_dir, "best_network", overwrite=True
-                )
+        # if valid_add.mean() < best_valid_add:
+        #     print("Best network result so far (ADD: {:.5f} mm)".format(valid_add))
+        #     best_valid_add = valid_add
+        #
+        #     if save_results:
+        #         dream_network.save_network(
+        #             output_dir, "best_network", overwrite=True
+        #         )
 
         this_epoch_timestamp = time.time() - training_start_time
         print(

@@ -44,7 +44,7 @@ class DreamNetwork:
         print("  Friendly keypoint names: {}".format(self.friendly_keypoint_names))
         print("  Architecture type: {}".format(self.architecture_type))
 
-        self.dataset_name = self.network_config["data_path"].split('/')[-1]
+        self.dataset_name = self.network_config["data_path"].split(os.sep)[-1]
         self.image_normalization = self.network_config["architecture"]["image_normalization"]
         self.position_normalization = self.network_config["architecture"]["positions_normalization"][self.dataset_name]
 

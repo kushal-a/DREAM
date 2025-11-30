@@ -75,7 +75,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         self.include_ground_truth = include_ground_truth
         self.include_belief_maps = include_belief_maps
 
-        self.dataset_name = network.network_config["data_path"].split('/')[-1]
+        self.dataset_name = network.network_config["data_path"].split(os.sep)[-1]
 
         self.debug_mode = debug_mode
 
@@ -220,7 +220,7 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         keypoint_positions_wrt_cam_as_tensor -= torch.tensor(self.position_normalization["mean"])
         keypoint_positions_wrt_cam_as_tensor /= torch.tensor(self.position_normalization["max"])
-
+        
         # Construct output sample
         sample = {
             "image_rgb_input": image_rgb_net_input_as_tensor,
@@ -276,23 +276,26 @@ class ManipulatorNDDSDataset(TorchDataset):
     
     def get_optical_flow_data(self, img_path):
         optical_flow_path = self.convert_path(img_path)
+        
         if os.path.exists(optical_flow_path): 
             with np.load(optical_flow_path) as data:
-                file_names = data["filenames"]
+                file_names = data["history"]
 
             optical_flows = []
             for file in file_names:
                 dirpath, _ = os.path.split(optical_flow_path)
-                new_filename = f"{file}.npz"
+                new_filename = f"{file}"
                 file_path = os.path.join(dirpath, new_filename)
                 optical_flows.append(self.process_optical_flow(file_path))
             optical_flows_array = np.array(optical_flows)
+            print(f"{optical_flows_array.shape=}")
             return optical_flows_array
-        return None
+        return 0
 
     def process_optical_flow(self, optical_flow_path):
+        optical_flow_path
         with np.load(optical_flow_path) as data:
-            flow2 = np.array(data["flow"], dtype=np.int8)
+            flow2 = np.array(data["flow"], dtype=np.int8).permute(2,0,1)
 
         flow3 = np.concatenate([flow2,np.zeros_like(flow2[:,:,0])],axis = -1)
         optical_img = PILImage.fromarray(flow3, mode="RGB")
@@ -303,14 +306,14 @@ class ManipulatorNDDSDataset(TorchDataset):
         return optical_flow_net_input_as_tensor[:,:,:2]
 
     @staticmethod
-    def convert_path(self, path: str) -> str:
+    def convert_path(path: str) -> str:
         # Split path into components
         parts = path.split(os.sep)
         
         # Replace the exact folder name "data"
         for i, p in enumerate(parts):
-            if p == "data":
-                parts[i] = "data_flow"
+            if p[-4:] == "data":
+                parts[i] += "_flow"
                 break   # only the first exact match at that segment
         
         # Rebuild the path

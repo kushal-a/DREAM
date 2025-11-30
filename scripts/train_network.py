@@ -312,10 +312,11 @@ def train_network(args):
                 print("This training batch size: {}".format(this_batch_size))
 
             # New unified training
-            network_input_heads = sample["image_rgb_input"].cuda()
+            images = sample["image_rgb_input"].cuda()
             training_labels = sample["keypoint_positions"].cuda()
+            optical_flow = sample["optical_flow"].cuda()
 
-            loss = dream_network.train(network_input_heads, training_labels)
+            loss = dream_network.train(images, training_labels, optical_flow)
 
             training_loss_this_batch = loss.item()
             training_batch_losses.append(training_loss_this_batch)
@@ -361,8 +362,9 @@ def train_network(args):
                 # New unified validation
                 valid_network_input_heads = valid_sample["image_rgb_input"].cuda()
                 valid_labels = valid_sample["keypoint_positions"].cuda()
+                valid_optical_flow = valid_sample["optical_flow"].cuda()
 
-                predicted_keypoints = dream_network.inference(valid_network_input_heads)
+                predicted_keypoints = dream_network.inference(valid_network_input_heads, valid_optical_flow)
 
                 all_pred_keypoints.append(predicted_keypoints)
                 all_gt_keypoints.append(valid_labels)

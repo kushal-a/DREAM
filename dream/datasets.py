@@ -227,7 +227,7 @@ class ManipulatorNDDSDataset(TorchDataset):
             "keypoint_projections_output": kp_projs_net_output_as_tensor,
             "keypoint_positions": keypoint_positions_wrt_cam_as_tensor,
             "config": datum,
-            "optical_flow": self.get_optical_flow_data(index),
+            "optical_flow": self.get_optical_flow_data(image_rgb_path),
         }
 
         if self.debug_mode >= ManipulatorNDDSDatasetDebugLevels["LIGHT"]:
@@ -274,8 +274,7 @@ class ManipulatorNDDSDataset(TorchDataset):
 
         return sample
     
-    def get_optical_flow_data(self, index):
-        img_path = self.ndds_dataset_data[index]["data_path"]
+    def get_optical_flow_data(self, img_path):
         optical_flow_path = self.convert_path(img_path)
         if os.path.exists(optical_flow_path): 
             with np.load(optical_flow_path) as data:

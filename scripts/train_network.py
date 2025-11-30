@@ -363,8 +363,8 @@ def train_network(args):
                 valid_labels = valid_sample["keypoint_positions"].cuda()
 
                 predicted_keypoints = dream_network.inference(valid_network_input_heads)
-                predicted_keypoints *= found_dataset.clamps[found_dataset.dataset_name]["max"]
-                predicted_keypoints += found_dataset.clamps[found_dataset.dataset_name]["mean"]
+                predicted_keypoints *= torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["max"])
+                predicted_keypoints += torch.tensor(found_dataset.clamps[found_dataset.dataset_name]["mean"])
 
                 all_pred_keypoints.append(predicted_keypoints)
                 all_gt_keypoints.append(valid_labels)

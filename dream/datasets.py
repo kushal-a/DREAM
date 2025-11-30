@@ -73,7 +73,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         self.include_ground_truth = include_ground_truth
         self.include_belief_maps = include_belief_maps
 
-        self.dataset_name = network.network_config["data_path"].split('\\')[-1]
+        self.dataset_name = network.network_config["data_path"].split('/')[-1]
 
         self.debug_mode = debug_mode
 

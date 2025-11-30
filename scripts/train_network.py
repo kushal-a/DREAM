@@ -18,6 +18,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 import dream
 from pprint import pprint
+import metrics
 
 
 def train_network(args):
@@ -35,24 +36,24 @@ def train_network(args):
     training_config     = network_config["training"]
     posediff_config_path= network_config["posediff_config"]
     logging_config      = network_config["logging"]
-    
+
 
     # Handling Dataset Config Extraction
     dataset_path        = dataset_config["dataset_path"]
     dataset_type        = dataset_config["dataset_type"]
     if dataset_type == "real":
-        input_data_path = os.path.join(dataset_path, 
-                                 dataset_type, 
+        input_data_path = os.path.join(dataset_path,
+                                 dataset_type,
                                  "panda-" + dataset_config["real"]["cam"]
                                  )
-        
+
     elif dataset_type == "synth":
         synth_type = dataset_config["synth"]["type"]
-        input_data_path = os.path.join(dataset_path, 
-                                 dataset_type, 
+        input_data_path = os.path.join(dataset_path,
+                                 dataset_type,
                                  "panda_synth_" + synth_type
                                  )
-        
+
     else:
         raise Exception("Typo in config file dataset<dataset_type")
     found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
@@ -77,7 +78,7 @@ def train_network(args):
     # Handling Logging Config Extraction
     output_dir      = logging_config["output_dir"]
     save_results    = logging_config["save_results"]
-    verbose         = logging_config["verbose"] 
+    verbose         = logging_config["verbose"]
     dream.utilities.makedirs(output_dir, exist_ok=args.force_overwrite)
 
     # Handling Required Overwrites for DREAM compatibility
@@ -99,8 +100,8 @@ def train_network(args):
     gpu_ids = args.gpu_ids if args.gpu_ids else []
     platform_config = odict(
         [
-            ("user", user), 
-            ("hostname", socket.gethostname()), 
+            ("user", user),
+            ("hostname", socket.gethostname()),
             ("gpu_ids", gpu_ids)
         ]
     )
@@ -113,7 +114,7 @@ def train_network(args):
 
     print("Network configuration:")
     pprint(network_config)
-    
+
     training_start_time = time.time()
 
     # Load weights, logs and config from output directory if resuming training
@@ -156,9 +157,11 @@ def train_network(args):
         valid_parser = YAML(typ="safe")
         with open(best_valid_network_config_path, "r") as f:
             best_valid_network_config = valid_parser.load(f)
-        best_valid_loss = best_valid_network_config["training"]["results"][
-            "validation_loss"
-        ]["mean"]
+        # best_valid_loss = best_valid_network_config["training"]["results"][
+        #     "validation_loss"
+        # ]["mean"]
+
+        best_valid_add = best_valid_network_config["training"]["results"]["validation_add"]["mean"]
 
         # Load in the old training log
         if os.path.exists(os.path.join(output_dir, "training_log.pkl")):
@@ -221,16 +224,16 @@ def train_network(args):
         train_log = {
             "epochs": [],
             "losses": [],
-            "validation_losses": [],
+            "validation_add": [],
+            "validation_auc": [],
             "batch_training_losses": [],
-            "batch_validation_losses": [],
             "batch_training_sample_names": [],
             "batch_validation_sample_names": [],
             "start_time": training_start_time,
             "timestamps": [],
             "random_seed": random_seed,
         }
-        best_valid_loss = float("Inf")
+        best_valid_add = float("Inf")
         start_epoch = 0
 
     dream.utilities.set_random_seed(random_seed)
@@ -311,7 +314,7 @@ def train_network(args):
             # New unified training
             network_input_heads = sample["image_rgb_input"].cuda()
             training_labels = sample["keypoint_positions"].cuda()
-            
+
             loss = dream_network.train(network_input_heads, training_labels)
 
             training_loss_this_batch = loss.item()
@@ -333,6 +336,9 @@ def train_network(args):
             print("~~ Validation Phase ~~")
 
         dream_network.enable_evaluation()
+
+        all_pred_keypoints = []
+        all_gt_keypoints = []
 
         with torch.no_grad():
 
@@ -357,22 +363,38 @@ def train_network(args):
                 valid_network_input_heads = valid_sample["image_rgb_input"].cuda()
                 valid_labels = valid_sample["keypoint_positions"].cuda()
 
-                valid_loss = dream_network.loss(valid_network_input_heads, valid_labels)
+                # valid_loss = dream_network.loss(valid_network_input_heads, valid_labels)
 
-                valid_loss_this_batch = valid_loss.item()
-                valid_batch_losses.append(valid_loss_this_batch)
-                if verbose:
-                    print(
-                        "Validation loss for this batch: {}".format(
-                            valid_loss_this_batch
-                        )
-                    )
-                    print("")
+
+                # valid_loss_this_batch = valid_loss.item()
+                # valid_batch_losses.append(valid_loss_this_batch)
+                # if verbose:
+                #     print(
+                #         "Validation loss for this batch: {}".format(
+                #             valid_loss_this_batch
+                #         )
+                #     )
+                #     print("")
+                # valid_batch_sample_names.append(this_valid_batch_sample_names)
+                # writer.add_scalar('Loss/valid', valid_loss_this_batch, e * len(valid_data_loader) + valid_batch_idx)
+                predicted_keypoints = dream_network.inference(valid_network_input_heads)
+
+                all_pred_keypoints.append(predicted_keypoints)
+                all_gt_keypoints.append(valid_labels)
                 valid_batch_sample_names.append(this_valid_batch_sample_names)
-                writer.add_scalar('Loss/valid', valid_loss_this_batch, e * len(valid_data_loader) + valid_batch_idx)
 
-            mean_valid_loss_per_batch = np.mean(valid_batch_losses)
-            std_valid_loss_per_batch = np.std(valid_batch_losses)
+            # mean_valid_loss_per_batch = np.mean(valid_batch_losses)
+            # std_valid_loss_per_batch = np.std(valid_batch_losses)
+
+        all_pred_keypoints = torch.cat(all_pred_keypoints, dim=0)
+        all_gt_keypoints = torch.cat(all_gt_keypoints, dim=0)
+
+        valid_add = metrics.compute_add(all_pred_keypoints, all_gt_keypoints)['add']
+        valid_auc = metrics.compute_auc(all_pred_keypoints, all_gt_keypoints)['auc']
+
+        writer.add_scalar('Epoch/train_noise_loss', mean_training_loss_per_batch, e)
+        writer.add_scalar('Epoch/valid_ADD', valid_add, e)
+        writer.add_scalar('Epoch/valid_AUC', valid_auc, e)
 
         writer.flush()
         writer.close()
@@ -385,10 +407,20 @@ def train_network(args):
                 ("stdev", float(std_training_loss_per_batch)),
             ]
         )
-        dream_network.network_config["training"]["results"]["validation_loss"] = odict(
+        # dream_network.network_config["training"]["results"]["validation_loss"] = odict(
+        #     [
+        #         ("mean", float(mean_valid_loss_per_batch)),
+        #         ("stdev", float(std_valid_loss_per_batch)),
+        #     ]
+        # )
+        dream_network.network_config["training"]["results"]["validation_add"] = odict(
             [
-                ("mean", float(mean_valid_loss_per_batch)),
-                ("stdev", float(std_valid_loss_per_batch)),
+                ("mean", float(valid_add)),
+            ]
+        )
+        dream_network.network_config["training"]["results"]["validation_auc"] = odict(
+            [
+                ("mean", float(valid_auc)),
             ]
         )
         print(
@@ -396,17 +428,29 @@ def train_network(args):
                 mean_training_loss_per_batch, std_training_loss_per_batch
             )
         )
-        print(
-            "Validation Loss (batch-wise mean +- 1 stdev): {} +- {}".format(
-                mean_valid_loss_per_batch, std_valid_loss_per_batch
-            )
-        )
+        # print(
+        #     "Validation Loss (batch-wise mean +- 1 stdev): {} +- {}".format(
+        #         mean_valid_loss_per_batch, std_valid_loss_per_batch
+        #     )
+        # )
+        print("Validation ADD (mm):  {:.5f}".format(valid_add))
+        print("Validation AUC (%):   {:.5f}".format(valid_auc))
+        print("=" * 70)
 
         # Save network if it's better than anything trained so far
-        if mean_valid_loss_per_batch < best_valid_loss:
+        # if mean_valid_loss_per_batch < best_valid_loss:
+        #
+        #     print("Best network result so far.")
+        #     best_valid_loss = mean_valid_loss_per_batch
+        #
+        #     if save_results:
+        #         dream_network.save_network(
+        #             output_dir, "best_network", overwrite=True
+        #         )
 
-            print("Best network result so far.")
-            best_valid_loss = mean_valid_loss_per_batch
+        if valid_add < best_valid_add:
+            print("Best network result so far (ADD: {:.5f} mm)".format(valid_add))
+            best_valid_add = valid_add
 
             if save_results:
                 dream_network.save_network(
@@ -425,9 +469,11 @@ def train_network(args):
         # Append to history
         train_log["epochs"].append(this_epoch)
         train_log["losses"].append(mean_training_loss_per_batch)
-        train_log["validation_losses"].append(mean_valid_loss_per_batch)
+        # train_log["validation_losses"].append(mean_valid_loss_per_batch)
+        train_log["validation_add"].append(valid_add)
+        train_log["validation_auc"].append(valid_auc)
         train_log["batch_training_losses"].append(training_batch_losses)
-        train_log["batch_validation_losses"].append(valid_batch_losses)
+        # train_log["batch_validation_losses"].append(valid_batch_losses)
         train_log["batch_training_sample_names"].append(training_batch_sample_names)
         train_log["batch_validation_sample_names"].append(valid_batch_sample_names)
         train_log["timestamps"].append(this_epoch_timestamp)
@@ -475,7 +521,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "-c", "--config-file", 
+        "-c", "--config-file",
         default="./config/config.yaml", type=str,
         help="Path to config file."
     )

@@ -4,7 +4,6 @@ import numpy as np
 
 def calculate_and_save_flow_with_history(input_dir, output_dir):
     
-    # --- CONFIGURATION ---
     # Farneback Params
     PYR_SCALE = 0.5   
     LEVELS = 3        
@@ -70,10 +69,12 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
             prev_gray, next_gray, None, 
             PYR_SCALE, LEVELS, WIN_SIZE, ITERATIONS, POLY_N, POLY_SIGMA, FLAGS
         )
-
+        angle = np.arctan2(flow[..., 1], flow[..., 0])
+        angle_scaled = angle * (SCENE_CHANGE_THRESHOLD / np.pi)
+        flow = np.dstack((flow, angle_scaled))
         # 3. Check for Scene Change / High Flow
         # We check the Mean Magnitude. If the average movement is > 15, it's a jump.
-        mag = np.linalg.norm(flow, axis=2)
+        mag = np.linalg.norm(flow[..., :2], axis=2)
         mag_f = mag.max()
         
         # Name of the file we are about to save
@@ -97,7 +98,6 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
             history_buffer = []
             
         else:
-            # Normal Operation
             
             # Get the last 16 items from the running buffer
             # Copy it to avoid modifying the global list
@@ -105,14 +105,14 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
             
             # Pad with "0000.npz" if we don't have enough history yet
             padding_needed = SEQ_LEN - len(valid_history)
-            history_to_save = (["0000.npz"] * padding_needed) + valid_history
+            history_to_save = (["000000.npz"] * padding_needed) + valid_history
 
         # 4. Save Data
         # We save the flow AND the list of strings
         # max_flow = max(max_flow, flow_mag.max())
         # flow /= 50
         # flow *= 256
-        flow = (flow / 20) * 127
+        flow = (flow / 20) * 127 ##global normalization fro angle also thats whuy above i got it into range of +-20
 
         save_path = os.path.join(output_dir, current_filename)
         np.savez_compressed(
@@ -134,7 +134,7 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
 # ------------------------------------------------------------
 # Usage
 # ------------------------------------------------------------
-INPUT_FOLDER = "/Users/batputer/Documents/CMU-courses/16-824/Project/DREAM/data/real/panda-3cam_realsense"
-OUTPUT_FOLDER = "/Users/batputer/Documents/CMU-courses/16-824/Project/data_flow/real/panda-3cam_realsense"
+INPUT_FOLDER = "data/real/panda-3cam_realsense"
+OUTPUT_FOLDER = "data_flow/real/panda-3cam_realsense"
 
 calculate_and_save_flow_with_history(INPUT_FOLDER, OUTPUT_FOLDER)

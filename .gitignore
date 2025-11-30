@@ -14,3 +14,7 @@ dream.egg-info/
 
 output/
 training_analysis/
+data_flow/*/*/flow_data
+data_flow/*/*/flow_heatmaps
+data_flow/*/*/flow_visualizations_dense
+data_flow/*/*/flow_dense*.npz

@@ -53,7 +53,8 @@ def calculate_and_save_dense_flow(input_dir, output_dir):
     # Output directories
     VISUAL_DIR = os.path.join(output_dir, "flow_visualizations_dense")
     HEATMAP_DIR = os.path.join(output_dir, "flow_heatmaps") # <--- NEW DIR
-    DATA_DIR = os.path.join(output_dir, "flow_data_dense")
+    # DATA_DIR = os.path.join(output_dir, "flow_data_dense")
+    DATA_DIR = output_dir
     
     os.makedirs(VISUAL_DIR, exist_ok=True)
     os.makedirs(HEATMAP_DIR, exist_ok=True) # <--- Create it
@@ -86,7 +87,7 @@ def calculate_and_save_dense_flow(input_dir, output_dir):
     hsv_buffer = np.zeros_like(prev_frame)
     hsv_buffer[..., 1] = 255
 
-    print(f"➡ Starting Processing...")
+    print(f" Starting Processing...")
     print(f"  Heatmaps will be saved to: {HEATMAP_DIR}")
 
     # --- MAIN LOOP ---
@@ -105,22 +106,25 @@ def calculate_and_save_dense_flow(input_dir, output_dir):
             PYR_SCALE, LEVELS, WIN_SIZE, ITERATIONS, POLY_N, POLY_SIGMA, FLAGS
         )
 
+        flow /= WIN_SIZE
+        flow *= 256
+
         # 2. SAVE DATA
         np.savez_compressed(
-            os.path.join(DATA_DIR, f"flow_dense_{i:04d}.npz"),
+            os.path.join(DATA_DIR, f"{i:06d}.npz"),
             flow=flow.astype(np.int8) 
         )
 
-        # 3. VISUALIZE STANDARD (HSV)
-        mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-        hsv_buffer[..., 0] = ang * 180 / np.pi / 2
-        hsv_buffer[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-        vis_img = cv2.cvtColor(hsv_buffer, cv2.COLOR_HSV2BGR)
-        cv2.imwrite(os.path.join(VISUAL_DIR, f"flow_visual_{i:04d}.jpg"), vis_img)
+        # # 3. VISUALIZE STANDARD (HSV)
+        # mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+        # hsv_buffer[..., 0] = ang * 180 / np.pi / 2
+        # hsv_buffer[..., 2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
+        # vis_img = cv2.cvtColor(hsv_buffer, cv2.COLOR_HSV2BGR)
+        # cv2.imwrite(os.path.join(VISUAL_DIR, f"flow_visual_{i:04d}.jpg"), vis_img)
 
-        # 4. VISUALIZE HEATMAP (With Bar) <--- NEW STEP
-        heatmap_path = os.path.join(HEATMAP_DIR, f"flow_heatmap_{i:04d}.jpg")
-        save_flow_heatmap_with_bar(flow, heatmap_path)
+        # # 4. VISUALIZE HEATMAP (With Bar) <--- NEW STEP
+        # heatmap_path = os.path.join(HEATMAP_DIR, f"flow_heatmap_{i:04d}.jpg")
+        # save_flow_heatmap_with_bar(flow, heatmap_path)
 
         # Update
         prev_gray = next_gray
@@ -128,12 +132,12 @@ def calculate_and_save_dense_flow(input_dir, output_dir):
         if i % 10 == 0:
             print(f"Processed frame {i}/{len(image_files)}")
 
-    print("✅ Completed. Heatmaps and Data saved.")
+    print("Completed. Heatmaps and Data saved.")
 
 # ------------------------------------------------------------
 # Usage
 # ------------------------------------------------------------
-INPUT_FOLDER = "real/panda-orb"
+INPUT_FOLDER = "data/real/panda-orb"
 OUTPUT_FOLDER = "data_flow/real/panda-orb"
 
 calculate_and_save_dense_flow(INPUT_FOLDER, OUTPUT_FOLDER)

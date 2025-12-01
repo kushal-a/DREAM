@@ -11,9 +11,9 @@ import numpy as np
 from ruamel.yaml import YAML
 import torch
 import torchvision.transforms as TVTransforms
-
+from torch.utils.tensorboard import SummaryWriter
 import dream
-
+import time
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def network_inference(args):
@@ -69,7 +69,7 @@ def network_inference(args):
     print(
         "# Loading ground truth keypoints from {} ...".format(keypoints_path)
     )
-    
+
     # Grandparent directory of the image file
     input_data_path = os.path.dirname(os.path.abspath(args.image_path))
     found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
@@ -98,7 +98,7 @@ def network_inference(args):
     img = found_dataset.tensor_from_image_no_norm_tform(
             image_rgb_NetInput_asPilImage
         ).unsqueeze(0)
-    
+
     keypoints_gt = dream.utilities.load_keypoints(
         keypoints_path,
         dream_network.manipulator_name,
@@ -123,6 +123,16 @@ def network_inference(args):
     keypoints_overlay.show(
         title="Keypoints (possibly with ground truth) on net input image"
     )
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+    tb_log_dir = os.path.join(args.output_dir, "inference_" + timestamp)
+    os.makedirs(tb_log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=tb_log_dir)
+    image_num = args.image_path
+    image_num = image_num.split(os.sep)[-1]
+    to_tensor = TVTransforms.ToTensor()
+    writer.add_image(image_num, to_tensor(keypoints_overlay))
+    writer.flush()
+    writer.close()
 
     print("Done.")
 
@@ -165,6 +175,11 @@ if __name__ == "__main__":
         "--image-preproc-override",
         default=None,
         help="Overrides the image preprocessing specified by the network. (Debug argument.)",
+    )
+    parser.add_argument(
+            "-o",
+            "--output-dir",
+            default="output",
     )
     args = parser.parse_args()
 

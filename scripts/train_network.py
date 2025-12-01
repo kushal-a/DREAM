@@ -315,7 +315,7 @@ def train_network(args):
             images = sample["image_rgb_input"].cuda()
             training_labels = sample["keypoint_positions"].cuda()
             optical_flow = sample["optical_flow"].cuda()
-            print(optical_flow)
+
             loss = dream_network.train(images, training_labels, optical_flow)
 
             training_loss_this_batch = loss.item()

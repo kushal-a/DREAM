@@ -129,17 +129,17 @@ def calculate_and_save_flow_with_history(input_dir, output_dir):
         if i % 10 == 0:
             print(f"Processed frame {i}")
 
+    np.savez_compressed(
+            os.path.join(output_dir, '000000.npz'),
+            flow=np.zeros_like(flow).astype(np.int8),
+            history=np.array(["000000.npz"]*SEQ_LEN) # Save as numpy array of strings
+        )
     print(f"Completed. Data saved to {output_dir}")
 
 # ------------------------------------------------------------
 # Usage
 # ------------------------------------------------------------
-<<<<<<< HEAD
 INPUT_FOLDER = "data/real/panda-3cam_realsense"
 OUTPUT_FOLDER = "data_flow/real/panda-3cam_realsense"
-=======
-INPUT_FOLDER = "./data/real/panda-3cam_realsense"
-OUTPUT_FOLDER = "./data_flow/real/panda-3cam_realsense"
->>>>>>> 1ad70e56e309baef50b1785e8ff852263ce9cab4
 
 calculate_and_save_flow_with_history(INPUT_FOLDER, OUTPUT_FOLDER)

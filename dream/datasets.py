@@ -288,22 +288,39 @@ class ManipulatorNDDSDataset(TorchDataset):
                 file_path = os.path.join(dirpath, new_filename)
                 optical_flows.append(self.process_optical_flow(file_path))
             optical_flows_array = np.array(optical_flows)
-            print(f"{optical_flows_array.shape=}")
             return optical_flows_array
         return 0
 
     def process_optical_flow(self, optical_flow_path):
-        optical_flow_path
         with np.load(optical_flow_path) as data:
-            flow2 = np.array(data["flow"], dtype=np.int8).permute(2,0,1)
+            flow = data["flow"].astype(np.int8)
 
-        flow3 = np.concatenate([flow2,np.zeros_like(flow2[:,:,0])],axis = -1)
-        optical_img = PILImage.fromarray(flow3, mode="RGB")
-        optical_img_before_aug = dream.image_proc.preprocess_image(
-            optical_img, self.network_input_resolution, self.image_preprocessing
+        H, W, C = flow.shape
+        idx = np.arange(H * W, dtype=np.uint32).reshape(H, W)
+
+        r = (idx & 0xFF).astype(np.uint8)
+        g = ((idx >> 8) & 0xFF).astype(np.uint8)
+        b = ((idx >> 16) & 0xFF).astype(np.uint8)
+
+        idx_rgb = np.stack([r, g, b], axis=2)
+        idx_pil = PILImage.fromarray(idx_rgb, mode="RGB")
+        processed_idx_pil = dream.image_proc.preprocess_image(
+            idx_pil, self.network_input_resolution, self.image_preprocessing
         )
-        optical_flow_net_input_as_tensor = torch.tensor(optical_img_before_aug) # Assuming no augmentation
-        return optical_flow_net_input_as_tensor[:,:,:2]
+
+        processed_idx_np = np.array(processed_idx_pil)  # shape (H2, W2, 3), dtype=uint8
+        idx_decoded = (
+            processed_idx_np[..., 0].astype(np.uint32)
+            | (processed_idx_np[..., 1].astype(np.uint32) << 8)
+            | (processed_idx_np[..., 2].astype(np.uint32) << 16)
+        )  # shape (H2, W2), values into [0, H*W-1]
+
+        flat_flow = flow.reshape(-1, 3)  # (H*W, 3)
+        sampled_flat = flat_flow[idx_decoded.ravel()]  # (H2*W2, 3)
+        sampled = sampled_flat.reshape(*processed_idx_np.shape)  # H2, W2, 3
+        optical_flow_net_input_as_tensor = torch.tensor(sampled).permute(2,0,1)
+        return optical_flow_net_input_as_tensor
+
 
     @staticmethod
     def convert_path(path: str) -> str:

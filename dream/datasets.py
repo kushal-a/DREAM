@@ -288,7 +288,7 @@ class ManipulatorNDDSDataset(TorchDataset):
                 file_path = os.path.join(dirpath, new_filename)
                 optical_flows.append(self.process_optical_flow(file_path))
             optical_flows_array = np.array(optical_flows)
-            return optical_flows_array
+            return torch.tensor(optical_flows_array)
         return 0
 
     def process_optical_flow(self, optical_flow_path):

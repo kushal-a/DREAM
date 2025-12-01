@@ -65,18 +65,6 @@ def network_inference(args):
             )
         )
 
-    print("Detecting keypoints...")
-    detection_result = dream_network.keypoints_from_image(
-        image_rgb_OrigInput_asPilImage,
-        image_preprocessing_override=image_preprocessing,
-        debug=True,
-        opical_flow = found_dataset.get_optical_flow_data(args.image_path)
-    )
-
-    positions = torch.tensor(detection_result["positions"]).unsqueeze(0)
-
-    image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
-
     # Read in gt keypoints
     print(
         "# Loading ground truth keypoints from {} ...".format(keypoints_path)
@@ -93,6 +81,19 @@ def network_inference(args):
         augment_data=enable_augment_data,
         include_ground_truth=True,
     )
+
+    print("Detecting keypoints...")
+    detection_result = dream_network.keypoints_from_image(
+        image_rgb_OrigInput_asPilImage,
+        image_preprocessing_override=image_preprocessing,
+        debug=True,
+        opical_flow = found_dataset.get_optical_flow_data(args.image_path)
+    )
+
+    positions = torch.tensor(detection_result["positions"]).unsqueeze(0)
+
+    image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
+
 
     img = found_dataset.tensor_from_image_no_norm_tform(
             image_rgb_NetInput_asPilImage

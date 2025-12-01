@@ -203,7 +203,7 @@ class DreamNetwork:
                 0
             ).cuda()
             positions_batch = self.inference(
-                input_rgb_image_as_tensor_batch, optical_flow
+                input_rgb_image_as_tensor_batch, optical_flow.unsqueeze(0).cuda()
             ).cpu()
 
         positions = np.array(

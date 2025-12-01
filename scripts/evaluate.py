@@ -43,7 +43,8 @@ def network_inference(args):
 
     print("Loading network with weights from:  {} ...".format(args.input_params_path))
     state_dict = torch.load(args.input_params_path, weights_only=False)
-    dream_network.model.load_state_dict(state_dict)
+    #dream_network.model.load_state_dict(state_dict)
+    dream_network.load_state_dict(state_dict)
     dream_network.enable_evaluation()
 
     # Load in image

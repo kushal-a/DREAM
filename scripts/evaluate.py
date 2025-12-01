@@ -42,7 +42,8 @@ def network_inference(args):
     dream_network = dream.create_network_from_config_data(network_config)
 
     print("Loading network with weights from:  {} ...".format(args.input_params_path))
-    dream_network.model.load_state_dict(torch.load(args.input_params_path))
+    state_dict = torch.load(args.input_params_path, weights_only=False)
+    dream_network.model.load_state_dict(state_dict)
     dream_network.enable_evaluation()
 
     # Load in image
@@ -68,20 +69,16 @@ def network_inference(args):
     print(f"Detecting keypoints {args.num_predictions} times...")
     all_positions = []
 
-    for i in range(args.num_predictions):
-        detection_result = dream_network.keypoints_from_image(
-            image_rgb_OrigInput_asPilImage,
-            image_preprocessing_override=image_preprocessing,
-            debug=(i == 0)
-        )
+    detection_result = dream_network.keypoints_from_image(
+        image_rgb_OrigInput_asPilImage,
+        image_preprocessing_override=image_preprocessing,
+        n=args.num_predicitons
+    )
 
-        positions = torch.tensor(detection_result["positions"])
-
-        all_positions.append(positions)
+    all_positions = torch.tensor(detection_result["positions"])
 
     # image_rgb_NetInput_asPilImage = detection_result["image_rgb_net_input"]
 
-    all_positions = torch.stack(all_positions)
 
     joint_names = [
         'panda_link0',
@@ -216,7 +213,7 @@ if __name__ == "__main__":
         help="Path to network configuration file. If nothing is specified, the script will search for a config file by the same name as the network parameters file.",
     )
     parser.add_argument(
-        "-m", "--image_path", required=True, help="Path to image used for inference."
+        "-m", "--image-path", required=True, help="Path to image used for inference."
     )
     parser.add_argument(
         "-g",

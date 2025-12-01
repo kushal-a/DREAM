@@ -170,7 +170,7 @@ class DreamNetwork:
     # Returns keypoints in the input image (not necessarily network input) frame
     # Allows for an optional overwrite
     def keypoints_from_image(
-        self, input_rgb_image_as_pil, image_preprocessing_override=None, debug=False, optical_flow = None
+        self, input_rgb_image_as_pil, image_preprocessing_override=None, debug=False, optical_flow = None, n=1
     ):
         # do preprocessing
         image_preprocessing = (
@@ -201,13 +201,13 @@ class DreamNetwork:
         with torch.no_grad():
             input_rgb_image_as_tensor_batch = input_rgb_image_as_tensor.unsqueeze(
                 0
-            ).cuda()
+            ).repeat(n,1,1,1).cuda()
             positions_batch = self.inference(
-                input_rgb_image_as_tensor_batch, optical_flow.unsqueeze(0).cuda()
+                input_rgb_image_as_tensor_batch, optical_flow.unsqueeze(0).repeat(n,1,1,1,1).cuda()
             ).cpu()
 
         positions = np.array(
-            positions_batch[0], dtype=float
+            positions_batch, dtype=float
         )
 
         detection_result = {"positions": positions}

@@ -87,7 +87,7 @@ def network_inference(args):
         image_rgb_OrigInput_asPilImage,
         image_preprocessing_override=image_preprocessing,
         debug=True,
-        opical_flow = found_dataset.get_optical_flow_data(args.image_path)
+        optical_flow = found_dataset.get_optical_flow_data(args.image_path)
     )
 
     positions = torch.tensor(detection_result["positions"]).unsqueeze(0)

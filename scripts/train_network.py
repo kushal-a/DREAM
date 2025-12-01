@@ -146,22 +146,22 @@ def train_network(args):
             start_epoch < epochs
         ), "Network is already trained for the number of requested epochs."
 
-        # Find the best network to determine its validation loss
-        best_valid_network_config_path = os.path.join(
-            output_dir, "best_network.yaml"
-        )
-        assert os.path.exists(
-            best_valid_network_config_path
-        ), "Could not determine the best validation loss."
+        # # Find the best network to determine its validation loss
+        # best_valid_network_config_path = os.path.join(
+        #     output_dir, "best_network.yaml"
+        # )
+        # assert os.path.exists(
+        #     best_valid_network_config_path
+        # ), "Could not determine the best validation loss."
 
-        valid_parser = YAML(typ="safe")
-        with open(best_valid_network_config_path, "r") as f:
-            best_valid_network_config = valid_parser.load(f)
-        # best_valid_loss = best_valid_network_config["training"]["results"][
-        #     "validation_loss"
-        # ]["mean"]
+        # valid_parser = YAML(typ="safe")
+        # with open(best_valid_network_config_path, "r") as f:
+        #     best_valid_network_config = valid_parser.load(f)
+        # # best_valid_loss = best_valid_network_config["training"]["results"][
+        # #     "validation_loss"
+        # # ]["mean"]
 
-        best_valid_add = best_valid_network_config["training"]["results"]["validation_add"]["mean"]
+        # best_valid_add = best_valid_network_config["training"]["results"]["validation_add"]["mean"]
 
         # Load in the old training log
         if os.path.exists(os.path.join(output_dir, "training_log.pkl")):

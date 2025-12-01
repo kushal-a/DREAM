@@ -106,7 +106,7 @@ def network_inference(args):
         fig, axes = plt.subplots(1, 3, figsize=(12, 3))
         for c in range(C):
             axes[c].hist(all_positions[:, j, c].cpu().numpy(), bins=30)
-            axes[c].set_title(f"{joint_names[j]} – {axis_names[c]}")
+            axes[c].set_title(f"{joint_names[j]} - {axis_names[c]}")
 
         plt.tight_layout()
 

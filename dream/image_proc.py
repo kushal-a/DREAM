@@ -570,11 +570,11 @@ def overlay_points_on_image(
             elif idx_point == 4:  # L-Hand
                 text_position = (text_position[0] - 40, text_position[1] + 20)
             elif idx_point == 5:  # R-S1
-                text_position = (text_position[0], text_position[1] - 25)
+                text_position = (text_position[0], text_position[1] + 25)
             elif idx_point == 6:  # R-W0
-                text_position = (text_position[0], text_position[1] - 25)
+                text_position = (text_position[0], text_position[1] - 20)
             elif idx_point == 7:  # R-Hand
-                text_position = (text_position[0], text_position[1] + 20)
+                text_position = (text_position[0], text_position[1] - 40)
             cv2.putText(
                 drawn_image,
                 image_point_names[idx_point],

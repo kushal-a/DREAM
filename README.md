@@ -2,7 +2,7 @@
 1. Clone the repository
     ``` bash
     git clone https://github.com/kushal-a/DREAM.git
-    cd PoseDiffExps
+    cd DREAM/PoseDiffExps
     git clone https://github.com/Glonks/PoseDiff-experiments.git posediff
     cd ..
     ```

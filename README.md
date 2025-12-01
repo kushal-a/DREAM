@@ -2,13 +2,13 @@
 1. Clone the repository
     ``` bash
     git clone https://github.com/kushal-a/DREAM.git
-    cd PoseDiffExps
+    cd DREAM/PoseDiffExps
     git clone https://github.com/Glonks/PoseDiff-experiments.git posediff
     cd ..
     ```
 2. Install libraries using
     ``` bash
-    pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cu128
+    pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
     ```
     It is preferred to use an environment.
 3. Install cloned packages

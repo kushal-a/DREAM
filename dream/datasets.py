@@ -282,9 +282,9 @@ class ManipulatorNDDSDataset(TorchDataset):
                 file_names = data["history"]
 
             optical_flows = []
-            for file in file_names:
+            for i in range(1,5):
                 dirpath, _ = os.path.split(optical_flow_path)
-                new_filename = f"{file}"
+                new_filename = f"{file_names[-i]}"
                 file_path = os.path.join(dirpath, new_filename)
                 optical_flows.append(self.process_optical_flow(file_path))
             optical_flows_array = np.array(optical_flows)

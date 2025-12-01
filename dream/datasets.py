@@ -318,7 +318,7 @@ class ManipulatorNDDSDataset(TorchDataset):
         flat_flow = flow.reshape(-1, 3)  # (H*W, 3)
         sampled_flat = flat_flow[idx_decoded.ravel()]  # (H2*W2, 3)
         sampled = sampled_flat.reshape(*processed_idx_np.shape)  # H2, W2, 3
-        optical_flow_net_input_as_tensor = torch.tensor(sampled).permute(2,0,1)
+        optical_flow_net_input_as_tensor = torch.tensor(sampled, dtype=torch.float32).permute(2,0,1)
         return optical_flow_net_input_as_tensor
 
 

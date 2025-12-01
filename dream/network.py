@@ -97,7 +97,7 @@ class DreamNetwork:
     def loss(self, network_input_heads, target, optical_flow):
         target = target.reshape(network_input_heads.shape[0], -1)
         noise = torch.randn_like(target)
-        pred = self.model(network_input_heads, target, noise, optical_flow)
+        pred = self.model(network_input_heads, optical_flow, target, noise)
         # Verify TODO
         if self.model.training:
             loss = self.criterion(pred, noise)

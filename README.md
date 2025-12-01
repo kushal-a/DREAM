@@ -8,7 +8,7 @@
     ```
 2. Install libraries using
     ``` bash
-    pip install -r requirements.txt --index-url https://download.pytorch.org/whl/cu128
+    pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
     ```
     It is preferred to use an environment.
 3. Install cloned packages

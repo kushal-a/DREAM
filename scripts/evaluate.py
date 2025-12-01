@@ -69,10 +69,23 @@ def network_inference(args):
     print(f"Detecting keypoints {args.num_predictions} times...")
     all_positions = []
 
+    # Grandparent directory of the image file
+    input_data_path = os.path.dirname(os.path.abspath(args.image_path))
+    found_data = dream.utilities.find_ndds_data_in_dir(input_data_path)
+    enable_augment_data = False if not network_config['training']['config']['data_augmentation'] else True
+    found_dataset = dream.datasets.ManipulatorNDDSDataset(
+        found_data,
+        dream_network,
+        network_config,
+        augment_data=enable_augment_data,
+        include_ground_truth=True,
+    )
+
     detection_result = dream_network.keypoints_from_image(
         image_rgb_OrigInput_asPilImage,
         image_preprocessing_override=image_preprocessing,
-        n=args.num_predictions
+        n=args.num_predictions,
+        optical_flow = found_dataset.get_optical_flow_data(args.image_path)
     )
 
     all_positions = torch.tensor(detection_result["positions"])

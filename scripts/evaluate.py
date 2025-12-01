@@ -72,7 +72,7 @@ def network_inference(args):
     detection_result = dream_network.keypoints_from_image(
         image_rgb_OrigInput_asPilImage,
         image_preprocessing_override=image_preprocessing,
-        n=args.num_predicitons
+        n=args.num_predictions
     )
 
     all_positions = torch.tensor(detection_result["positions"])
